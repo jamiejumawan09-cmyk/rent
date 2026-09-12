@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json();
 
