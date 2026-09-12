@@ -98,9 +98,8 @@ export default function HomePage() {
 
   useEffect(() => {
     const session = getSession();
-    if (!session) { router.replace("/login"); return; }
-    setUserName(session.name || session.email);
-  }, [router]);
+    if (session) setUserName(session.name || session.email);
+  }, []);
 
   function handleLogout() {
     clearSession();
