@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabase, getSupabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const { name, email, password } = await req.json();
+  const supabaseAdmin = getSupabaseAdmin();
+  const supabase = getSupabase();
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  // Check if email already exists in our users table
   const { data: existing } = await supabaseAdmin
     .from("users")
     .select("id")
@@ -23,21 +18,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Email already registered." }, { status: 400 });
   }
 
-  // Supabase Auth signUp — sends OTP email automatically
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: { name }, emailRedirectTo: undefined },
   });
 
-  // Also send OTP explicitly so user gets a code not a link
-  await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Store extra user info in our users table
   if (data.user) {
     await supabaseAdmin.from("users").insert({
       id: data.user.id,

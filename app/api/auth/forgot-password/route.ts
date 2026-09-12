@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabase, getSupabaseAdmin } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
@@ -8,11 +7,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action } = body;
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabase();
+  const supabaseAdmin = getSupabaseAdmin();
 
   if (action === "send_otp") {
     const { email } = body;
@@ -30,20 +26,12 @@ export async function POST(req: NextRequest) {
 
   if (action === "update_password") {
     const { email, password } = body;
-    const { data: user } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .single();
-
+    const { data: user } = await supabaseAdmin.from("users").select("id").eq("email", email).single();
     if (!user) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
     const password_hash = await bcrypt.hash(password, 12);
     await supabaseAdmin.from("users").update({ password_hash }).eq("id", user.id);
-
-    // Also update password in Supabase Auth
     await supabaseAdmin.auth.admin.updateUserById(user.id, { password });
-
     await supabaseAdmin.from("activity_logs").insert({ user_id: user.id, action: "password_reset" });
     return NextResponse.json({ message: "Password updated successfully." });
   }

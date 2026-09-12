@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const { email, type } = await req.json();
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = getSupabase();
 
   if (type === "register") {
     const { error } = await supabase.auth.resend({ type: "signup", email });
