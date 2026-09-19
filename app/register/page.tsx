@@ -46,8 +46,7 @@ export default function RegisterPage() {
 
     if (!res.ok) { setServerError(data.error); return; }
 
-    sessionStorage.setItem("reg_email", form.email);
-    router.push("/verify-otp?type=register");
+    router.push("/login");
   }
 
   const strength = (() => {
@@ -162,7 +161,7 @@ export default function RegisterPage() {
             disabled={loading}
             className="mt-2 bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-gray-700 disabled:opacity-60"
           >
-            {loading ? "Sending OTP..." : "REGISTER NOW"}
+            {loading ? "Registering..." : "REGISTER NOW"}
           </button>
         </form>
 

@@ -11,8 +11,11 @@ export default function Header() {
 
         {/* Navigation */}
         <nav className="hidden md:flex items-center gap-8">
-          <Link href="Home" className="text-sm font-medium hover:text-gray-600">
+          <Link href="/home" className="text-sm font-medium hover:text-gray-600">
             Home
+          </Link>
+          <Link href="/houses" className="text-sm font-medium hover:text-gray-600">
+            Houses
           </Link>
           <Link href="/about" className="text-sm font-medium hover:text-gray-600">
             About

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase, getSupabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
@@ -7,21 +7,13 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action } = body;
-  const supabase = getSupabase();
   const supabaseAdmin = getSupabaseAdmin();
 
-  if (action === "send_otp") {
+  if (action === "check_email") {
     const { email } = body;
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ message: "OTP sent." });
-  }
-
-  if (action === "verify_otp") {
-    const { email, otp } = body;
-    const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: "email" });
-    if (error) return NextResponse.json({ error: "Incorrect or expired OTP." }, { status: 400 });
-    return NextResponse.json({ message: "OTP verified." });
+    const { data: user } = await supabaseAdmin.from("users").select("id").eq("email", email).single();
+    if (!user) return NextResponse.json({ error: "No account found with that email." }, { status: 404 });
+    return NextResponse.json({ message: "Email found." });
   }
 
   if (action === "update_password") {
@@ -31,8 +23,6 @@ export async function POST(req: NextRequest) {
 
     const password_hash = await bcrypt.hash(password, 12);
     await supabaseAdmin.from("users").update({ password_hash }).eq("id", user.id);
-    await supabaseAdmin.auth.admin.updateUserById(user.id, { password });
-    await supabaseAdmin.from("activity_logs").insert({ user_id: user.id, action: "password_reset" });
     return NextResponse.json({ message: "Password updated successfully." });
   }
 

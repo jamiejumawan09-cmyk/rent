@@ -15,7 +15,22 @@ create table if not exists public.users (
   updated_at    timestamptz not null default now()
 );
 
--- 2. ACTIVITY LOGS
+-- 2. PROPERTIES
+create table if not exists public.properties (
+  id          uuid primary key default gen_random_uuid(),
+  title       text not null,
+  location    text not null,
+  price       text not null,
+  status      text not null default 'Available',
+  description text,
+  beds        integer,
+  baths       integer,
+  sqm         integer,
+  images      text[] default '{}',
+  created_at  timestamptz not null default now()
+);
+
+-- 3. ACTIVITY LOGS
 create table if not exists public.activity_logs (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid references public.users(id) on delete set null,
@@ -27,8 +42,9 @@ create table if not exists public.activity_logs (
 -- ============================================================
 -- INDEXES
 -- ============================================================
-create index if not exists idx_logs_user_id on public.activity_logs(user_id);
-create index if not exists idx_users_email  on public.users(email);
+create index if not exists idx_logs_user_id    on public.activity_logs(user_id);
+create index if not exists idx_users_email     on public.users(email);
+create index if not exists idx_properties_created on public.properties(created_at desc);
 
 -- ============================================================
 -- AUTO-UPDATE updated_at on users
@@ -51,6 +67,7 @@ create trigger users_updated_at
 -- ============================================================
 alter table public.users         enable row level security;
 alter table public.activity_logs enable row level security;
+alter table public.properties    enable row level security;
 
 -- Service role bypasses RLS (used by supabaseAdmin in API routes)
 -- No public policies needed since all DB access goes through server API routes

@@ -1,32 +1,20 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const OTP_LENGTH = 6;
-const OTP_EXPIRY = 120;
-type Step = "email" | "otp" | "password" | "done";
+type Step = "email" | "password" | "done";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""));
-  const [otpError, setOtpError] = useState("");
-  const [otpSuccess, setOtpSuccess] = useState("");
-  const [timer, setTimer] = useState(OTP_EXPIRY);
   const [passwords, setPasswords] = useState({ password: "", confirm: "" });
   const [passErrors, setPassErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const inputs = useRef<(HTMLInputElement | null)[]>([]);
-
-  useEffect(() => {
-    if (step !== "otp" || timer <= 0) return;
-    const id = setInterval(() => setTimer((t) => t - 1), 1000);
-    return () => clearInterval(id);
-  }, [step, timer]);
+  const [serverError, setServerError] = useState("");
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,55 +24,11 @@ export default function ForgotPasswordPage() {
     const res = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "send_otp", email }),
+      body: JSON.stringify({ action: "check_email", email }),
     });
     const data = await res.json();
     setLoading(false);
-    setStep("otp");
-  }
-
-  function handleOtpChange(val: string, idx: number) {
-    if (!/^\d?$/.test(val)) return;
-    const next = [...otp]; next[idx] = val; setOtp(next);
-    if (val && idx < OTP_LENGTH - 1) inputs.current[idx + 1]?.focus();
-  }
-
-  function handleOtpKeyDown(e: React.KeyboardEvent, idx: number) {
-    if (e.key === "Backspace" && !otp[idx] && idx > 0) inputs.current[idx - 1]?.focus();
-  }
-
-  function handleOtpPaste(e: React.ClipboardEvent) {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
-    if (pasted.length === OTP_LENGTH) { setOtp(pasted.split("")); inputs.current[OTP_LENGTH - 1]?.focus(); }
-  }
-
-  async function handleResend() {
-    setOtp(Array(OTP_LENGTH).fill("")); setOtpError(""); setLoading(true);
-    const res = await fetch("/api/auth/resend-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, type: "forgot_password" }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    setTimer(OTP_EXPIRY);
-    setOtpSuccess("OTP resent!"); setTimeout(() => setOtpSuccess(""), 3000);
-  }
-
-  async function handleOtpSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (otp.join("").length < OTP_LENGTH) { setOtpError("Enter the complete 6-digit OTP."); return; }
-    if (timer <= 0) { setOtpError("OTP expired. Please resend."); return; }
-    setLoading(true); setOtpError("");
-
-    const res = await fetch("/api/auth/forgot-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "verify_otp", email, otp: otp.join("") }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) { setOtpError(data.error); return; }
+    if (!res.ok) { setEmailError(data.error); return; }
     setStep("password");
   }
 
@@ -96,22 +40,18 @@ export default function ForgotPasswordPage() {
     else if (!/[0-9]/.test(passwords.password)) errs.password = "Must contain a number.";
     if (passwords.password !== passwords.confirm) errs.confirm = "Passwords do not match.";
     if (Object.keys(errs).length) { setPassErrors(errs); return; }
-    setLoading(true);
+    setLoading(true); setServerError("");
 
     const res = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update_password", email, password: passwords.password }),
     });
+    const data = await res.json();
     setLoading(false);
-    if (!res.ok) return;
+    if (!res.ok) { setServerError(data.error); return; }
     setStep("done");
   }
-
-  const mins = String(Math.floor(timer / 60)).padStart(2, "0");
-  const secs = String(timer % 60).padStart(2, "0");
-  const stepLabels: Step[] = ["email", "otp", "password", "done"];
-  const stepIdx = stepLabels.indexOf(step);
 
   const strength = (() => {
     const p = passwords.password; if (!p) return 0;
@@ -137,23 +77,11 @@ export default function ForgotPasswordPage() {
           <span className="text-2xl italic text-red-500">ent</span>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-1 mb-4">
-          {["Email", "OTP", "Password", "Done"].map((label, i) => (
-            <div key={label} className="flex items-center gap-1">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${i <= stepIdx ? "bg-gray-800 text-white" : "bg-gray-200 text-gray-500"}`}>
-                {i < stepIdx ? "✓" : i + 1}
-              </div>
-              {i < 3 && <div className={`w-6 h-0.5 ${i < stepIdx ? "bg-gray-800" : "bg-gray-200"}`} />}
-            </div>
-          ))}
-        </div>
-
-        {/* Step 1 */}
+        {/* Step 1 - Email */}
         {step === "email" && (
           <form onSubmit={handleEmailSubmit} className="flex flex-col gap-2">
             <h2 className="text-sm font-bold text-center mb-1">Forgot Password</h2>
-            <p className="text-xs text-gray-500 text-center mb-2">Enter your registered email to receive an OTP.</p>
+            <p className="text-xs text-gray-500 text-center mb-2">Enter your registered email to reset your password.</p>
             <label className="text-xs font-semibold">Email address</label>
             <input
               className={`border rounded px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-gray-400 ${emailError ? "border-red-400" : ""}`}
@@ -162,48 +90,17 @@ export default function ForgotPasswordPage() {
             />
             {emailError && <p className="text-red-500 text-[10px]">{emailError}</p>}
             <button disabled={loading} className="mt-1 bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-gray-700 disabled:opacity-60">
-              {loading ? "Sending OTP..." : "SEND OTP"}
+              {loading ? "Checking..." : "CONTINUE"}
             </button>
           </form>
         )}
 
-        {/* Step 2 */}
-        {step === "otp" && (
-          <form onSubmit={handleOtpSubmit}>
-            <h2 className="text-sm font-bold text-center mb-1">Enter OTP</h2>
-            <p className="text-xs text-gray-500 text-center mb-3">OTP sent to <span className="font-semibold text-gray-700">{email}</span></p>
-            <div className="flex justify-center gap-2 mb-3" onPaste={handleOtpPaste}>
-              {otp.map((digit, i) => (
-                <input key={i} ref={(el) => { inputs.current[i] = el; }}
-                  type="text" inputMode="numeric" maxLength={1} value={digit}
-                  onChange={(e) => handleOtpChange(e.target.value, i)}
-                  onKeyDown={(e) => handleOtpKeyDown(e, i)}
-                  className="w-10 h-10 text-center text-sm font-bold border-2 rounded outline-none focus:border-gray-800"
-                />
-              ))}
-            </div>
-            {otpError && <p className="text-red-500 text-[10px] text-center mb-2">{otpError}</p>}
-            {otpSuccess && <p className="text-green-600 text-[10px] text-center mb-2">{otpSuccess}</p>}
-            <div className="text-center mb-3">
-              {timer > 0
-                ? <p className="text-xs text-gray-500">Expires in <span className={`font-bold ${timer <= 30 ? "text-red-500" : ""}`}>{mins}:{secs}</span></p>
-                : <p className="text-xs text-red-500 font-semibold">OTP expired</p>}
-            </div>
-            <button disabled={loading || timer <= 0} className="w-full bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-gray-700 disabled:opacity-60">
-              {loading ? "Verifying..." : "VERIFY OTP"}
-            </button>
-            <div className="text-center mt-2">
-              <button type="button" onClick={handleResend} disabled={timer > 0 || loading} className="text-xs text-blue-600 hover:underline disabled:text-gray-400">
-                Resend OTP {timer > 0 && `(${mins}:${secs})`}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Step 3 */}
+        {/* Step 2 - New Password */}
         {step === "password" && (
           <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-2">
             <h2 className="text-sm font-bold text-center mb-1">New Password</h2>
+            <p className="text-xs text-gray-500 text-center mb-2">Set a new password for <span className="font-semibold text-gray-700">{email}</span></p>
+            {serverError && <p className="text-red-500 text-[10px] text-center">{serverError}</p>}
             <div>
               <label className="text-xs font-semibold">New password</label>
               <input
@@ -234,7 +131,7 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        {/* Step 4 */}
+        {/* Step 3 - Done */}
         {step === "done" && (
           <div className="text-center py-4">
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">

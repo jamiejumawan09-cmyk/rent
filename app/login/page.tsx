@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { getSession, setSession } from "@/lib/session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,10 +42,8 @@ export default function LoginPage() {
 
     if (!res.ok) { setServerError(data.error); return; }
 
-    sessionStorage.setItem("login_email", form.email);
-    if (data.name) sessionStorage.setItem("login_name", data.name);
-
-    router.push("/verify-otp?type=login");
+    setSession({ email: form.email, name: data.name });
+    router.push(form.email === "admin@homerent.ph" ? "/admin" : "/home");
   }
 
   return (
