@@ -46,7 +46,10 @@ export default function RegisterPage() {
 
     if (!res.ok) { setServerError(data.error); return; }
 
-    router.push("/login");
+    // Store email and name for the OTP page
+    sessionStorage.setItem("reg_email", form.email);
+    sessionStorage.setItem("reg_name", form.name);
+    router.push("/verify-otp?type=register");
   }
 
   const strength = (() => {

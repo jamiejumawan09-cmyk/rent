@@ -30,6 +30,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const beds = formData.get("beds") ? Number(formData.get("beds")) : null;
     const baths = formData.get("baths") ? Number(formData.get("baths")) : null;
     const sqm = formData.get("sqm") ? Number(formData.get("sqm")) : null;
+    const landlord_email = (formData.get("landlord_email") as string) || null;
+    const landlord_name  = (formData.get("landlord_name")  as string) || null;
     const newImages = formData.getAll("images") as File[];
     const existingImages: string[] = JSON.parse((formData.get("existingImages") as string) || "[]");
 
@@ -56,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { data, error } = await supabase
       .from("properties")
-      .update({ title, location, price, status, description, beds, baths, sqm, images: imageUrls })
+      .update({ title, location, price, status, description, beds, baths, sqm, images: imageUrls, landlord_email, landlord_name })
       .eq("id", id)
       .select()
       .single();

@@ -8,7 +8,13 @@ export default function RootPage() {
   useEffect(() => {
     const session = getSession();
     if (session) {
-      router.replace(session.email === "admin@homerent.ph" ? "/admin" : "/home");
+      if (session.email === "admin@homerent.ph" || session.role === "admin") {
+        router.replace("/admin");
+      } else if (session.role === "landlord") {
+        router.replace("/landlord");
+      } else {
+        router.replace("/home");
+      }
     } else {
       router.replace("/home");
     }

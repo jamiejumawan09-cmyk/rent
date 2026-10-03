@@ -15,6 +15,8 @@ export default function ForgotPasswordPage() {
   const [passErrors, setPassErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,11 +105,20 @@ export default function ForgotPasswordPage() {
             {serverError && <p className="text-red-500 text-[10px] text-center">{serverError}</p>}
             <div>
               <label className="text-xs font-semibold">New password</label>
-              <input
-                className={`w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400 ${passErrors.password ? "border-red-400" : ""}`}
-                placeholder="Enter new password" type="password"
-                value={passwords.password} onChange={(e) => setPasswords({ ...passwords, password: e.target.value })}
-              />
+              <div className="relative mt-0.5">
+                <input
+                  className={`w-full border rounded px-2 py-1.5 pr-8 text-xs outline-none focus:ring-1 focus:ring-gray-400 ${passErrors.password ? "border-red-400" : ""}`}
+                  placeholder="Enter new password" type={showPw ? "text" : "password"}
+                  value={passwords.password} onChange={(e) => setPasswords({ ...passwords, password: e.target.value })}
+                />
+                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw ? (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  )}
+                </button>
+              </div>
               {passwords.password && (
                 <div className="mt-1">
                   <div className="flex gap-1">{[1,2,3,4].map((i) => <div key={i} className={`h-1 flex-1 rounded ${i <= strength ? strengthColor : "bg-gray-200"}`} />)}</div>
@@ -118,11 +129,20 @@ export default function ForgotPasswordPage() {
             </div>
             <div>
               <label className="text-xs font-semibold">Confirm password</label>
-              <input
-                className={`w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400 ${passErrors.confirm ? "border-red-400" : ""}`}
-                placeholder="Confirm new password" type="password"
-                value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-              />
+              <div className="relative mt-0.5">
+                <input
+                  className={`w-full border rounded px-2 py-1.5 pr-8 text-xs outline-none focus:ring-1 focus:ring-gray-400 ${passErrors.confirm ? "border-red-400" : ""}`}
+                  placeholder="Confirm new password" type={showConfirm ? "text" : "password"}
+                  value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                />
+                <button type="button" onClick={() => setShowConfirm((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showConfirm ? (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  )}
+                </button>
+              </div>
               {passErrors.confirm && <p className="text-red-500 text-[10px] mt-0.5">{passErrors.confirm}</p>}
             </div>
             <button disabled={loading} className="mt-1 bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-gray-700 disabled:opacity-60">

@@ -59,7 +59,7 @@ function VerifyOtpContent() {
     const res = await fetch("/api/auth/resend-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, type }),
+      body: JSON.stringify({ email }),
     });
 
     const data = await res.json();
@@ -83,7 +83,7 @@ function VerifyOtpContent() {
     const res = await fetch("/api/auth/verify-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp: code, type }),
+      body: JSON.stringify({ email, otp: code }),
     });
 
     const data = await res.json();
@@ -91,14 +91,21 @@ function VerifyOtpContent() {
 
     if (!res.ok) { setError(data.error); return; }
 
-    // Save session so home page knows user is logged in
     const name = type === "login"
       ? (sessionStorage.getItem("login_name") ?? "")
       : (sessionStorage.getItem("reg_name") ?? "");
-    setSession({ email, name });
+    const role = data.role ?? sessionStorage.getItem("login_role") ?? "user";
+    setSession({ email, name, role });
     sessionStorage.removeItem("reg_name");
     sessionStorage.removeItem("login_name");
-    router.push("/home");
+    sessionStorage.removeItem("login_role");
+    sessionStorage.removeItem("reg_email");
+    sessionStorage.removeItem("login_email");
+
+    // Redirect based on role
+    if (role === "admin") router.push("/admin");
+    else if (role === "landlord") router.push("/landlord");
+    else router.push("/home");
   }
 
   const mins = String(Math.floor(timer / 60)).padStart(2, "0");

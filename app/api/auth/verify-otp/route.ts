@@ -1,32 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase, getSupabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const { email, otp, type } = await req.json();
-  const supabase = getSupabase();
-  const supabaseAdmin = getSupabaseAdmin();
+  const { email, otp } = await req.json();
+  const supabase = getSupabaseAdmin();
 
-  const tokenType = type === "register" ? "signup" : "email";
+  const { data: user, error } = await supabase
+    .from("userss")
+    .select("id, name, otp, otp_expires, is_verified, role")
+    .eq("email", email)
+    .single();
 
-  const { data, error } = await supabase.auth.verifyOtp({
-    email,
-    token: otp,
-    type: tokenType,
-  });
-
-  if (error) {
-    return NextResponse.json({ error: "Incorrect or expired OTP." }, { status: 400 });
+  if (error || !user) {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
   }
 
-  if (data.user) {
-    await supabaseAdmin.from("users").update({ is_verified: true }).eq("email", email);
-    await supabaseAdmin.from("activity_logs").insert({
-      user_id: data.user.id,
-      action: type === "register" ? "account_verified" : "login_otp_verified",
-    });
+  if (!user.otp || user.otp !== otp) {
+    return NextResponse.json({ error: "Incorrect OTP." }, { status: 400 });
   }
 
-  return NextResponse.json({ message: "OTP verified successfully." });
+  if (!user.otp_expires || new Date() > new Date(user.otp_expires)) {
+    return NextResponse.json({ error: "OTP has expired. Please request a new one." }, { status: 400 });
+  }
+
+  // Clear OTP and mark verified
+  await supabase
+    .from("userss")
+    .update({ otp: null, otp_expires: null, is_verified: true })
+    .eq("email", email);
+
+  return NextResponse.json({ message: "Verified successfully.", name: user.name, role: user.role });
 }

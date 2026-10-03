@@ -42,8 +42,17 @@ export default function LoginPage() {
 
     if (!res.ok) { setServerError(data.error); return; }
 
-    setSession({ email: form.email, name: data.name });
-    router.push(form.email === "admin@homerent.ph" ? "/admin" : "/home");
+    if (data.verified) {
+      // Admin — direct login, no OTP
+      setSession({ email: form.email, name: data.name });
+      router.push("/admin");
+    } else {
+      // Regular user — redirect to OTP verification
+      sessionStorage.setItem("login_email", form.email);
+      sessionStorage.setItem("login_name", data.name);
+      sessionStorage.setItem("login_role", data.role ?? "user");
+      router.push("/verify-otp?type=login");
+    }
   }
 
   return (

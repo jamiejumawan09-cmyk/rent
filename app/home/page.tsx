@@ -17,33 +17,78 @@ type Property = {
   sqm?: number;
 };
 
-const stats = [
-  { value: "500+", label: "Properties Listed" },
-  { value: "1,200+", label: "Happy Tenants" },
-  { value: "50+", label: "Cities Covered" },
-  { value: "4.8★", label: "Average Rating" },
-];
-
 const statusBadge: Record<string, string> = {
-  Available: "bg-green-100 text-green-700",
-  Booked: "bg-blue-100 text-blue-700",
+  Available:   "bg-green-100 text-green-700",
+  Booked:      "bg-blue-100 text-blue-700",
   Maintenance: "bg-yellow-100 text-yellow-700",
+};
+
+type RatingSummary = Record<string, { avg: number; count: number }>;
+
+// ── Star display ─────────────────────────────────────────
+function StarRating({ avg, count }: { avg: number; count: number }) {
+  return (
+    <div className="flex items-center gap-1 mb-2">
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <svg key={n} className={`w-3 h-3 ${n <= Math.round(avg) ? "text-yellow-400" : "text-gray-200"}`} fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+        ))}
+      </div>
+      <span className="text-[10px] font-bold text-gray-700">{avg.toFixed(1)}</span>
+      <span className="text-[10px] text-gray-400">({count})</span>
+    </div>
+  );
+}
+
+type Stats = {
+  properties: number;
+  tenants: number;
+  cities: number;
+  bookings: number;
+  avgRating: string | null;
+  totalReviews: number;
 };
 
 export default function HomePage() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [userName, setUserName] = useState("");
+  const [search, setSearch]         = useState("");
+  const [userName, setUserName]     = useState("");
   const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]       = useState(true);
+  const [liveStats, setLiveStats]   = useState<Stats | null>(null);
+  const [ratings, setRatings]       = useState<RatingSummary>({});
+  const [announcements, setAnnouncements] = useState<{ id: string; message: string; type: string }[]>([]);
+  const [dismissedAnnounce, setDismissedAnnounce] = useState<string[]>([]);
 
   useEffect(() => {
     const session = getSession();
-    if (session) setUserName(session.name || session.email);
+    if (!session) { router.replace("/login"); return; }
+    if (session.role === "admin") { router.replace("/admin"); return; }
+    if (session.role === "landlord") { router.replace("/landlord"); return; }
+    setUserName(session.name || session.email);
+
     fetch("/api/properties")
       .then((r) => r.json())
       .then((d) => { setProperties(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
+
+    // Live stats
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((d) => setLiveStats(d))
+      .catch(() => {});
+
+    // Ratings summary
+    fetch("/api/reviews/summary")
+      .then((r) => r.json())
+      .then((d) => setRatings(d ?? {}))
+      .catch(() => {});
+
+    fetch("/api/announcements")
+      .then((r) => r.json())
+      .then((d) => setAnnouncements(Array.isArray(d) ? d : []));
   }, []);
 
   function handleLogout() {
@@ -58,6 +103,21 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
+
+      {/* Announcement banners */}
+      {announcements.filter((a) => !dismissedAnnounce.includes(a.id)).map((a) => {
+        const styles: Record<string, string> = {
+          info:    "bg-blue-600 text-white",
+          warning: "bg-yellow-400 text-yellow-900",
+          success: "bg-green-600 text-white",
+        };
+        return (
+          <div key={a.id} className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 text-sm font-medium ${styles[a.type] ?? styles.info}`}>
+            <span>{a.message}</span>
+            <button onClick={() => setDismissedAnnounce((p) => [...p, a.id])} className="shrink-0 opacity-70 hover:opacity-100 text-lg leading-none">×</button>
+          </div>
+        );
+      })}
 
       {/* Hero */}
       <section className="relative h-72 md:h-96 overflow-hidden">
@@ -103,9 +163,37 @@ export default function HomePage() {
       {/* Stats */}
       <section className="max-w-6xl mx-auto px-4 mt-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {stats.map((s) => (
+          {[
+            {
+              label: "Properties Listed",
+              value: liveStats ? `${liveStats.properties}` : "—",
+              icon: "🏠",
+            },
+            {
+              label: "Happy Tenants",
+              value: liveStats ? `${liveStats.tenants}` : "—",
+              icon: "👥",
+            },
+            {
+              label: "Cities Covered",
+              value: liveStats ? `${liveStats.cities}` : "—",
+              icon: "📍",
+            },
+            {
+              label: "Average Rating",
+              value: liveStats
+                ? liveStats.avgRating
+                  ? `${liveStats.avgRating}★`
+                  : "N/A"
+                : "—",
+              icon: "⭐",
+            },
+          ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl p-4 text-center shadow-sm border">
-              <p className="text-2xl font-extrabold text-gray-800">{s.value}</p>
+              <p className="text-xl mb-1">{s.icon}</p>
+              <p className={`text-2xl font-extrabold text-gray-800 ${!liveStats ? "animate-pulse text-gray-300" : ""}`}>
+                {s.value}
+              </p>
               <p className="text-xs text-gray-500 mt-1">{s.label}</p>
             </div>
           ))}
@@ -214,6 +302,10 @@ export default function HomePage() {
 
                   {p.description && (
                     <p className="text-[10px] text-gray-500 leading-relaxed mb-3 line-clamp-2">{p.description}</p>
+                  )}
+
+                  {ratings[p.id] && (
+                    <StarRating avg={ratings[p.id].avg} count={ratings[p.id].count} />
                   )}
 
                   <button

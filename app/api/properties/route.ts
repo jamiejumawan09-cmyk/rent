@@ -3,12 +3,13 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("properties")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const admin = new URL(req.url).searchParams.get("admin");
+  let query = supabase.from("properties").select("*").order("created_at", { ascending: false });
+  // Public listing excludes Pending (awaiting admin approval)
+  if (!admin) query = query.neq("status", "Pending");
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
@@ -26,7 +27,11 @@ export async function POST(req: NextRequest) {
     const beds = formData.get("beds") ? Number(formData.get("beds")) : null;
     const baths = formData.get("baths") ? Number(formData.get("baths")) : null;
     const sqm = formData.get("sqm") ? Number(formData.get("sqm")) : null;
+    const landlord_email = (formData.get("landlord_email") as string) || null;
+    const landlord_name  = (formData.get("landlord_name")  as string) || null;
     const images = formData.getAll("images") as File[];
+    const latitude  = formData.get("latitude")  ? Number(formData.get("latitude"))  : null;
+    const longitude = formData.get("longitude") ? Number(formData.get("longitude")) : null;
 
     const imageUrls: string[] = [];
 
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase.from("properties").insert({
       title, location, price, status, description, beds, baths, sqm,
-      images: imageUrls,
+      images: imageUrls, landlord_email, landlord_name, latitude, longitude,
     }).select().single();
 
     if (error) {
