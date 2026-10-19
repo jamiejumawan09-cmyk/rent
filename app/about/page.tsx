@@ -21,7 +21,7 @@ export default function AboutPage() {
   const router = useRouter();
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-[#800000]">
 
       {/* Hero */}
       <section className="relative h-64 md:h-80 overflow-hidden">

@@ -32,14 +32,14 @@ export default function MapPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-[#800000]">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-extrabold text-gray-800 mb-1">Listings Map</h1>
-        <p className="text-sm text-gray-500 mb-5">
+        <h1 className="text-2xl font-extrabold text-white mb-1">Listings Map</h1>
+        <p className="text-red-200 text-sm mb-5">
           {loading ? "Loading..." : `${listings.length} propert${listings.length !== 1 ? "ies" : "y"} with location data`}
         </p>
         {loading ? (
-          <div className="w-full h-[500px] rounded-xl bg-gray-200 animate-pulse" />
+          <div className="w-full h-[500px] rounded-xl bg-white/10 animate-pulse" />
         ) : (
           <Map listings={listings} />
         )}

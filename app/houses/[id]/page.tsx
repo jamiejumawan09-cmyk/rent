@@ -87,8 +87,21 @@ export default function PropertyDetailPage() {
   const [session, setSession]     = useState<{ email: string; name: string } | null>(null);
 
   // Booking form
-  const [form, setForm]               = useState({ move_in_date: "", message: "", payment_method: "Cash" });
-  const [booking, setBooking]         = useState(false);
+  const [form, setForm] = useState({
+    move_in_date:      "",
+    lease_duration:    "6 months",
+    occupants:         "1",
+    payment_method:    "Cash",
+    contact_method:    "Email",
+    employment_status: "Employed",
+    introduction:      "",
+    message:           "",
+  });
+  const [govIdFile,    setGovIdFile]    = useState<File | null>(null);
+  const [incomeFile,   setIncomeFile]   = useState<File | null>(null);
+  const [docErrors,    setDocErrors]    = useState({ govId: false, income: false });
+  const [termsAgreed,  setTermsAgreed]  = useState(false);
+  const [booking,      setBooking]      = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
@@ -162,12 +175,44 @@ export default function PropertyDetailPage() {
     e.preventDefault();
     if (!session) { router.push("/login"); return; }
     if (!form.move_in_date) { setBookingError("Please select a move-in date."); return; }
+    const missingGovId  = !govIdFile;
+    const missingIncome = !incomeFile;
+    if (missingGovId || missingIncome) {
+      setDocErrors({ govId: missingGovId, income: missingIncome });
+      setBookingError("Please upload both required documents before submitting.");
+      return;
+    }
+    setDocErrors({ govId: false, income: false });
+    if (!termsAgreed) { setBookingError("Please agree to the rental terms before submitting."); return; }
     setBooking(true); setBookingError("");
-    const res = await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ property_id: id, user_email: session.email, user_name: session.name, move_in_date: form.move_in_date, message: form.message, payment_method: form.payment_method }),
-    });
+
+    // Auto-calculate move-out date from move-in + lease duration
+    function calcMoveOut(moveIn: string, duration: string): string {
+      const d = new Date(moveIn);
+      const map: Record<string, number> = {
+        "1 month": 1, "3 months": 3, "6 months": 6, "1 year": 12,
+      };
+      d.setMonth(d.getMonth() + (map[duration] ?? 6));
+      return d.toISOString().split("T")[0];
+    }
+
+    const fd = new FormData();
+    fd.append("property_id",       id);
+    fd.append("user_email",        session.email);
+    fd.append("user_name",         session.name);
+    fd.append("move_in_date",      form.move_in_date);
+    fd.append("move_out_date",     calcMoveOut(form.move_in_date, form.lease_duration));
+    fd.append("lease_duration",    form.lease_duration);
+    fd.append("occupants",         form.occupants);
+    fd.append("payment_method",    form.payment_method);
+    fd.append("contact_method",    form.contact_method);
+    fd.append("employment_status", form.employment_status);
+    fd.append("introduction",      form.introduction);
+    fd.append("message",           form.message);
+    if (govIdFile)   fd.append("gov_id",       govIdFile);
+    if (incomeFile)  fd.append("income_proof", incomeFile);
+
+    const res = await fetch("/api/bookings", { method: "POST", body: fd });
     const data = await res.json();
     setBooking(false);
     if (!res.ok) { setBookingError(data.error); return; }
@@ -276,7 +321,7 @@ export default function PropertyDetailPage() {
   const images = property.images?.length ? property.images : [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#800000]">
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
           <button onClick={() => router.back()} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800">
@@ -579,25 +624,218 @@ export default function PropertyDetailPage() {
                       You need to <button type="button" onClick={() => router.push("/login")} className="underline font-semibold">log in</button> to book.
                     </p>
                   )}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-700">Payment Method *</label>
-                    <select className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400" value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })}>
-                      <option value="Cash">Cash</option>
-                      <option value="GCash">GCash</option>
-                    </select>
+
+                  {/* ── Price summary ── */}
+                  <div className="bg-gray-50 rounded-lg border p-3 flex flex-col gap-1.5">
+                    <p className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wide">Price Summary</p>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-600">Monthly rent</span>
+                      <span className="font-bold text-gray-800">{property.price}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-600">Security deposit</span>
+                      <span className="font-bold text-gray-800">1 month</span>
+                    </div>
+                    <div className="border-t border-gray-200 pt-1.5 flex justify-between text-xs">
+                      <span className="font-extrabold text-gray-800">Est. first payment</span>
+                      <span className="font-extrabold text-gray-900">2× monthly</span>
+                    </div>
                   </div>
+
+                  {/* ── Move-in Date ── */}
                   <div>
                     <label className="text-xs font-semibold text-gray-700">Move-in Date *</label>
-                    <input type="date" min={new Date().toISOString().split("T")[0]} className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400" value={form.move_in_date} onChange={(e) => setForm({ ...form, move_in_date: e.target.value })} />
+                    <input
+                      type="date"
+                      required
+                      min={new Date().toISOString().split("T")[0]}
+                      className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400"
+                      value={form.move_in_date}
+                      onChange={(e) => setForm({ ...form, move_in_date: e.target.value })}
+                    />
                   </div>
+
+                  {/* ── Lease Duration ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Lease Duration *</label>
+                    <select
+                      className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400"
+                      value={form.lease_duration}
+                      onChange={(e) => setForm({ ...form, lease_duration: e.target.value })}
+                    >
+                      <option>1 month</option>
+                      <option>3 months</option>
+                      <option>6 months</option>
+                      <option>1 year</option>
+                    </select>
+                    {form.move_in_date && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Move-out: {(() => {
+                          const d = new Date(form.move_in_date);
+                          const m: Record<string, number> = { "1 month": 1, "3 months": 3, "6 months": 6, "1 year": 12 };
+                          d.setMonth(d.getMonth() + (m[form.lease_duration] ?? 6));
+                          return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                        })()}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ── Occupants ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Number of Occupants *</label>
+                    <input
+                      type="number" min="1" max="20"
+                      required
+                      className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400"
+                      value={form.occupants}
+                      onChange={(e) => setForm({ ...form, occupants: e.target.value })}
+                    />
+                  </div>
+
+                  {/* ── Payment Method ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Payment Method *</label>
+                    <select
+                      className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400"
+                      value={form.payment_method}
+                      onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                    >
+                      <option>Cash</option>
+                      <option>GCash</option>
+                      <option>Bank Transfer</option>
+                    </select>
+                  </div>
+
+                  {/* ── Employment Status ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Employment Status *</label>
+                    <select
+                      className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400"
+                      value={form.employment_status}
+                      onChange={(e) => setForm({ ...form, employment_status: e.target.value })}
+                    >
+                      <option>Employed</option>
+                      <option>Self-employed</option>
+                      <option>Student</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+
+                  {/* ── Preferred Contact ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">Preferred Contact</label>
+                    <div className="flex gap-3 mt-1">
+                      {["Email", "Phone", "Messaging"].map((m) => (
+                        <label key={m} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
+                          <input
+                            type="radio"
+                            name="contact_method"
+                            value={m}
+                            checked={form.contact_method === m}
+                            onChange={() => setForm({ ...form, contact_method: m })}
+                            className="accent-gray-800"
+                          />
+                          {m}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── Tenant Introduction ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">About You</label>
+                    <textarea
+                      rows={3}
+                      className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400 resize-none"
+                      placeholder="Brief introduction — occupation, reason for renting, lifestyle..."
+                      value={form.introduction}
+                      onChange={(e) => setForm({ ...form, introduction: e.target.value })}
+                    />
+                  </div>
+
+                  {/* ── Message ── */}
                   <div>
                     <label className="text-xs font-semibold text-gray-700">Message (optional)</label>
-                    <textarea className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400 resize-none" rows={3} placeholder="Any questions or notes..." value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+                    <textarea
+                      rows={2}
+                      className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400 resize-none"
+                      placeholder="Any questions or notes for the landlord..."
+                      value={form.message}
+                      onChange={(e) => setForm({ ...form, message: e.target.value })}
+                    />
                   </div>
-                  <button type="submit" disabled={booking} className="w-full bg-gray-800 text-white text-xs font-bold py-2.5 rounded-lg hover:bg-gray-700 disabled:opacity-60">
+
+                  {/* ── Government ID ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">
+                      Government ID <span className="text-red-500">*</span>
+                    </label>
+                    <div
+                      className={`mt-0.5 border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${docErrors.govId ? "border-red-400 bg-red-50" : "border-gray-200 hover:border-gray-400"}`}
+                      onClick={() => document.getElementById("gov-id-input")?.click()}
+                    >
+                      {govIdFile ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-gray-700 truncate">{govIdFile.name}</span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setGovIdFile(null); setDocErrors((d) => ({ ...d, govId: true })); }} className="text-red-400 text-xs hover:text-red-600">✕</button>
+                        </div>
+                      ) : (
+                        <p className={`text-xs ${docErrors.govId ? "text-red-400" : "text-gray-400"}`}>Click to upload ID (JPG, PNG, PDF)</p>
+                      )}
+                      <input
+                        id="gov-id-input" type="file" accept="image/*,.pdf" className="hidden"
+                        onChange={(e) => { setGovIdFile(e.target.files?.[0] ?? null); setDocErrors((d) => ({ ...d, govId: false })); }}
+                      />
+                    </div>
+                    {docErrors.govId && <p className="text-[10px] text-red-500 mt-0.5">Government ID is required.</p>}
+                  </div>
+
+                  {/* ── Proof of Income ── */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700">
+                      Proof of Income <span className="text-red-500">*</span>
+                    </label>
+                    <div
+                      className={`mt-0.5 border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${docErrors.income ? "border-red-400 bg-red-50" : "border-gray-200 hover:border-gray-400"}`}
+                      onClick={() => document.getElementById("income-input")?.click()}
+                    >
+                      {incomeFile ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-gray-700 truncate">{incomeFile.name}</span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setIncomeFile(null); setDocErrors((d) => ({ ...d, income: true })); }} className="text-red-400 text-xs hover:text-red-600">✕</button>
+                        </div>
+                      ) : (
+                        <p className={`text-xs ${docErrors.income ? "text-red-400" : "text-gray-400"}`}>Payslip, COE, or bank statement</p>
+                      )}
+                      <input
+                        id="income-input" type="file" accept="image/*,.pdf" className="hidden"
+                        onChange={(e) => { setIncomeFile(e.target.files?.[0] ?? null); setDocErrors((d) => ({ ...d, income: false })); }}
+                      />
+                    </div>
+                    {docErrors.income && <p className="text-[10px] text-red-500 mt-0.5">Proof of Income is required.</p>}
+                  </div>
+
+                  {/* ── Terms & Conditions ── */}
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={termsAgreed}
+                      onChange={(e) => setTermsAgreed(e.target.checked)}
+                      className="mt-0.5 accent-gray-800 shrink-0"
+                    />
+                    <span className="text-[10px] text-gray-500 leading-relaxed">
+                      I agree to the rental terms. I confirm the information provided is accurate and understand that a security deposit equal to one month&apos;s rent is required upon approval.
+                    </span>
+                  </label>
+
+                  <button
+                    type="submit"
+                    disabled={booking || !session}
+                    className="w-full bg-gray-800 text-white text-xs font-bold py-2.5 rounded-lg hover:bg-gray-700 disabled:opacity-60 transition-colors"
+                  >
                     {booking ? "Submitting..." : "Submit Booking Request"}
                   </button>
-                  <p className="text-[10px] text-gray-400 text-center">Admin will review and approve your request.</p>
+                  <p className="text-[10px] text-gray-400 text-center">The landlord will review and respond to your request.</p>
                 </form>
               )}
             </div>

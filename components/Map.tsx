@@ -85,8 +85,22 @@ export default function Map({ listings, single }: Props) {
     if (!mapReady || !mapRef.current) return;
 
     (async () => {
-      const L = await import("leaflet");
-      await import("leaflet.markercluster");
+      const Lmod = await import("leaflet");
+      const L = Lmod.default ?? Lmod;
+
+      // leaflet.markercluster is a UMD plugin that self-attaches to window.L.
+      // Expose the exact same L instance globally before loading the plugin.
+      if (typeof window !== "undefined") {
+        (window as unknown as Record<string, unknown>).L = L;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (typeof (L as any).markerClusterGroup !== "function") {
+          // require() is synchronous after the dynamic import above,
+          // ensuring the plugin patches the same L already on window.
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          require("leaflet.markercluster");
+        }
+      }
+
       const map = mapRef.current!;
 
       // Remove existing cluster groups and non-user markers

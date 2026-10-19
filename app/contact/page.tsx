@@ -61,7 +61,7 @@ export default function ContactPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-[#800000]">
 
       {/* Hero */}
       <section className="bg-gray-800 py-14 px-4">

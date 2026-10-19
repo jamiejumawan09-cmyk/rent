@@ -4,6 +4,7 @@ export type SessionData = {
   email: string;
   name: string;
   role?: string;
+  avatar_url?: string | null;
 };
 
 export function getSession(): SessionData | null {

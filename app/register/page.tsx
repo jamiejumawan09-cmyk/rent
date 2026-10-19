@@ -7,7 +7,7 @@ import { getSession } from "@/lib/session";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", confirm: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -21,6 +21,7 @@ export default function RegisterPage() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Full name is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid email.";
+    if (form.phone.trim() && !/^[+]?[\d\s\-().]{7,20}$/.test(form.phone.trim())) e.phone = "Enter a valid phone number.";
     if (form.password.length < 8) e.password = "At least 8 characters.";
     else if (!/[A-Z]/.test(form.password)) e.password = "Must contain an uppercase letter.";
     else if (!/[0-9]/.test(form.password)) e.password = "Must contain a number.";
@@ -38,7 +39,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+      body: JSON.stringify({ name: form.name, email: form.email, phone: form.phone, password: form.password }),
     });
 
     const data = await res.json();
@@ -105,6 +106,25 @@ export default function RegisterPage() {
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
             {errors.email && <p className="text-red-500 text-[10px] mt-0.5">{errors.email}</p>}
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold">Phone number <span className="text-gray-400 font-normal">(optional)</span></label>
+            <div className="flex mt-0.5">
+              <span className="inline-flex items-center px-2 border border-r-0 rounded-l bg-gray-50 text-gray-400 text-xs">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </span>
+              <input
+                className={`flex-1 border rounded-r px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-gray-400 ${errors.phone ? "border-red-400" : ""}`}
+                placeholder="+63 912 345 6789"
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </div>
+            {errors.phone && <p className="text-red-500 text-[10px] mt-0.5">{errors.phone}</p>}
           </div>
 
           <div>

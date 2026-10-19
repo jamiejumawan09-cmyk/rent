@@ -10,8 +10,18 @@ type Booking = {
   user_email: string;
   user_name: string;
   move_in_date: string;
+  move_out_date?: string;
+  lease_duration?: string;
+  occupants?: number;
   message: string;
   payment_method: string;
+  employment_status?: string;
+  contact_method?: string;
+  introduction?: string;
+  gov_id_url?: string;
+  income_proof_url?: string;
+  payment_receipt_url?: string | null;
+  payment_confirmed?: boolean;
   status: "Pending" | "Approved" | "Rejected" | "Cancelled";
   created_at: string;
   properties: {
@@ -47,6 +57,54 @@ export default function BookingsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
 
+  // Document viewer
+  type DocModal = { name: string; url: string } | null;
+  const [docModal, setDocModal] = useState<DocModal>(null);
+  const [docSignedUrl, setDocSignedUrl] = useState<string | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const [docError, setDocError] = useState("");
+
+  async function openDocModal(name: string, url: string) {
+    setDocModal({ name, url });
+    setDocSignedUrl(null);
+    setDocError("");
+    setDocLoading(true);
+    const res = await fetch("/api/documents/signed-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    setDocLoading(false);
+    if (!res.ok) { setDocError(data.error ?? "Failed to load document."); return; }
+    setDocSignedUrl(data.signedUrl);
+  }
+
+  function closeDocModal() {
+    setDocModal(null);
+    setDocSignedUrl(null);
+    setDocError("");
+  }
+
+  // Receipt upload
+  const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
+  const [receiptError, setReceiptError]         = useState<Record<string, string>>({});
+
+  async function handleReceiptUpload(bookingId: string, file: File) {
+    if (!session) return;
+    setUploadingReceipt(bookingId);
+    setReceiptError((e) => ({ ...e, [bookingId]: "" }));
+    const fd = new FormData();
+    fd.append("id",               bookingId);
+    fd.append("user_email",       session.email);
+    fd.append("payment_receipt",  file);
+    const res  = await fetch("/api/bookings", { method: "PUT", body: fd });
+    const data = await res.json();
+    setUploadingReceipt(null);
+    if (!res.ok) { setReceiptError((e) => ({ ...e, [bookingId]: data.error })); return; }
+    setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, payment_receipt_url: data.payment_receipt_url } : b));
+  }
+
   useEffect(() => {
     const s = getSession();
     if (!s) { router.replace("/login"); return; }
@@ -66,16 +124,29 @@ export default function BookingsPage() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }
 
-  async function handleCancel(id: string) {
-    if (!confirm("Cancel this booking request?")) return;
+  async function handleCancel(id: string, currentStatus: string) {
+    const msg = currentStatus === "Approved"
+      ? "Cancel this approved booking? The property will be marked as Available again."
+      : "Cancel this booking request?";
+    if (!confirm(msg)) return;
     setCancelling(id);
+    const s = getSession();
     const res = await fetch("/api/bookings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: "Cancelled" }),
+      body: JSON.stringify({
+        id,
+        status: "Cancelled",
+        user_email: s?.email,
+        role: s?.role ?? "user",
+      }),
     });
     setCancelling(null);
-    if (res.ok) setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status: "Cancelled" as Booking["status"] } : b));
+    if (res.ok) {
+      setBookings((prev) =>
+        prev.map((b) => b.id === id ? { ...b, status: "Cancelled" as Booking["status"] } : b)
+      );
+    }
   }
 
   const counts = {
@@ -87,7 +158,43 @@ export default function BookingsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-[#800000]">
+
+      {/* ── Document viewer modal ── */}
+      {docModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={closeDocModal}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <p className="text-sm font-extrabold text-gray-800">{docModal.name}</p>
+              <div className="flex items-center gap-3">
+                {docSignedUrl && (
+                  <a href={docSignedUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-600 hover:underline">Open in new tab ↗</a>
+                )}
+                <button onClick={closeDocModal} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center min-h-[200px]">
+              {docLoading && (
+                <div className="flex flex-col items-center gap-2 text-gray-400">
+                  <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  <p className="text-xs">Loading document…</p>
+                </div>
+              )}
+              {!docLoading && docError && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded px-4 py-3">{docError}</p>
+              )}
+              {!docLoading && docSignedUrl && (
+                docModal.url.match(/\.(jpg|jpeg|png|gif|webp)([?#]|$)/i) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={docSignedUrl} alt={docModal.name} className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
+                ) : (
+                  <iframe src={docSignedUrl} className="w-full h-[65vh] rounded-lg border" title={docModal.name} />
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto px-4 py-10">
 
         {/* Header */}
@@ -234,6 +341,22 @@ export default function BookingsPage() {
                           })}
                         </p>
                       </div>
+                      {b.move_out_date && (
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Move-out Date</p>
+                          <p className="text-xs font-semibold text-gray-700 mt-0.5">
+                            {new Date(b.move_out_date).toLocaleDateString("en-US", {
+                              month: "long", day: "numeric", year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      )}
+                      {b.lease_duration && (
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Lease Duration</p>
+                          <p className="text-xs font-semibold text-gray-700 mt-0.5">{b.lease_duration}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Submitted</p>
                         <p className="text-xs font-semibold text-gray-700 mt-0.5">
@@ -242,21 +365,120 @@ export default function BookingsPage() {
                           })}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Booked by</p>
-                        <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{b.user_name}</p>
-                      </div>
+                      {b.occupants != null && (
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Occupants</p>
+                          <p className="text-xs font-semibold text-gray-700 mt-0.5">{b.occupants} person{b.occupants !== 1 ? "s" : ""}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Payment</p>
                         <p className="text-xs font-semibold text-gray-700 mt-0.5">{b.payment_method ?? "—"}</p>
                       </div>
+                      {b.employment_status && (
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Employment</p>
+                          <p className="text-xs font-semibold text-gray-700 mt-0.5">{b.employment_status}</p>
+                        </div>
+                      )}
+                      {b.contact_method && (
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Contact via</p>
+                          <p className="text-xs font-semibold text-gray-700 mt-0.5">{b.contact_method}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Booked by</p>
+                        <p className="text-xs font-semibold text-gray-700 mt-0.5 truncate">{b.user_name}</p>
+                      </div>
                     </div>
+
+                    {/* Introduction */}
+                    {b.introduction && (
+                      <div className="bg-blue-50 rounded-lg px-3 py-2 border border-blue-100">
+                        <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wide mb-0.5">About the Tenant</p>
+                        <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{b.introduction}</p>
+                      </div>
+                    )}
 
                     {/* Message */}
                     {b.message && (
                       <div className="bg-gray-50 rounded-lg px-3 py-2 border">
                         <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Your Message</p>
                         <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{b.message}</p>
+                      </div>
+                    )}
+
+                    {/* Documents */}
+                    {(b.gov_id_url || b.income_proof_url || b.payment_receipt_url) && (
+                      <div className="flex flex-wrap gap-2">
+                        {b.gov_id_url && (
+                          <button
+                            onClick={() => openDocModal("Government ID", b.gov_id_url!)}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-100 transition-colors"
+                          >
+                            🪪 View Government ID
+                          </button>
+                        )}
+                        {b.income_proof_url && (
+                          <button
+                            onClick={() => openDocModal("Income Proof", b.income_proof_url!)}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2.5 py-1 rounded-lg hover:bg-green-100 transition-colors"
+                          >
+                            📄 View Income Proof
+                          </button>
+                        )}
+                        {b.payment_receipt_url && (
+                          <button
+                            onClick={() => openDocModal("Payment Receipt", b.payment_receipt_url!)}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg hover:bg-purple-100 transition-colors"
+                          >
+                            💳 View Receipt
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Payment receipt upload — only for approved GCash/Bank Transfer bookings */}
+                    {b.status === "Approved" && ["GCash", "Bank Transfer"].includes(b.payment_method) && (
+                      <div className={`rounded-xl border px-4 py-3 ${b.payment_confirmed ? "bg-green-50 border-green-200" : b.payment_receipt_url ? "bg-purple-50 border-purple-200" : "bg-amber-50 border-amber-200"}`}>
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="text-xs font-extrabold text-gray-800">
+                              {b.payment_confirmed
+                                ? "💰 Payment Confirmed"
+                                : b.payment_receipt_url
+                                ? "📎 Receipt Submitted — Awaiting Confirmation"
+                                : `💳 Upload ${b.payment_method} Receipt`}
+                            </p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {b.payment_confirmed
+                                ? "Your payment has been verified by the landlord."
+                                : b.payment_receipt_url
+                                ? "The landlord will review your payment screenshot."
+                                : "Please upload your payment screenshot so the landlord can verify it."}
+                            </p>
+                            {receiptError[b.id] && (
+                              <p className="text-[10px] text-red-500 mt-1">{receiptError[b.id]}</p>
+                            )}
+                          </div>
+                          {!b.payment_confirmed && (
+                            <label className={`shrink-0 flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${uploadingReceipt === b.id ? "opacity-60 cursor-not-allowed bg-gray-200 text-gray-500" : "bg-gray-800 text-white hover:bg-gray-700"}`}>
+                              {uploadingReceipt === b.id ? "Uploading…" : b.payment_receipt_url ? "Re-upload" : "Upload Receipt"}
+                              <input
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                disabled={uploadingReceipt === b.id}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleReceiptUpload(b.id, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -267,7 +489,7 @@ export default function BookingsPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <p className="text-xs text-green-700 font-semibold">
-                          Your booking has been approved! The landlord will contact you soon.
+                          Approved! The landlord will contact you soon.
                         </p>
                       </div>
                     )}
@@ -292,7 +514,7 @@ export default function BookingsPage() {
                           </p>
                         </div>
                         <button
-                          onClick={() => handleCancel(b.id)}
+                          onClick={() => handleCancel(b.id, b.status)}
                           disabled={cancelling === b.id}
                           className="shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-60 transition-colors"
                         >

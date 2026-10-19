@@ -2,14 +2,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronDown, BookMarked, Heart, LogOut } from "lucide-react";
 import { clearSession } from "@/lib/session";
 
 interface UserMenuProps {
   userName: string;
+  avatarUrl?: string | null;
 }
 
-export default function UserMenu({ userName }: UserMenuProps) {
+export default function UserMenu({ userName, avatarUrl }: UserMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -49,17 +51,21 @@ export default function UserMenu({ userName }: UserMenuProps) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+        className="flex items-center gap-2.5 px-4 py-2 rounded-lg border border-white/30 bg-white/10 hover:bg-white/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >
         {/* Avatar */}
-        <span className="w-7 h-7 rounded-full bg-gray-800 flex items-center justify-center text-white text-xs font-bold shrink-0">
-          {initial}
+        <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-bold shrink-0 overflow-hidden">
+          {avatarUrl ? (
+            <Image src={avatarUrl} alt={userName} width={36} height={36} className="object-cover w-full h-full" />
+          ) : (
+            initial
+          )}
         </span>
-        <span className="text-sm font-medium text-gray-700 max-w-[100px] truncate hidden sm:block">
+        <span className="text-sm font-semibold text-white max-w-[120px] truncate hidden sm:block">
           {userName}
         </span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 text-white/60 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -67,9 +73,18 @@ export default function UserMenu({ userName }: UserMenuProps) {
       {open && (
         <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-gray-200 shadow-lg py-1 z-50">
           {/* User info header */}
-          <div className="px-4 py-2.5 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-800 truncate">{userName}</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">Signed in</p>
+          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden">
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt={userName} width={32} height={32} className="object-cover w-full h-full" />
+              ) : (
+                initial
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-800 truncate">{userName}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Signed in</p>
+            </div>
           </div>
 
           {/* Menu items */}

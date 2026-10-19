@@ -95,7 +95,7 @@ function VerifyOtpContent() {
       ? (sessionStorage.getItem("login_name") ?? "")
       : (sessionStorage.getItem("reg_name") ?? "");
     const role = data.role ?? sessionStorage.getItem("login_role") ?? "user";
-    setSession({ email, name, role });
+    setSession({ email, name, role, avatar_url: data.avatar_url ?? null });
     sessionStorage.removeItem("reg_name");
     sessionStorage.removeItem("login_name");
     sessionStorage.removeItem("login_role");
@@ -112,26 +112,26 @@ function VerifyOtpContent() {
   const secs = String(timer % 60).padStart(2, "0");
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white w-80 rounded-lg shadow-md p-5">
+    <div className="min-h-screen flex items-center justify-center bg-[#800000]">
+      <div className="bg-white/10 backdrop-blur-sm border border-white/20 w-80 rounded-lg shadow-md p-5">
         <div className="flex justify-center mb-1">
           <Image src="/logo.jpg" alt="Logo" width={40} height={40} className="rounded-full" />
         </div>
         <div className="flex justify-center mb-4">
-          <span className="text-2xl font-bold">HOME</span>
-          <span className="text-2xl font-bold text-red-500">R</span>
-          <span className="text-2xl italic text-red-500">ent</span>
+          <span className="text-2xl font-bold text-white">HOME</span>
+          <span className="text-2xl font-bold text-red-300">R</span>
+          <span className="text-2xl italic text-red-300">ent</span>
         </div>
 
         <div className="text-center mb-4">
-          <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-2">
+          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2">
             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
-          <h2 className="text-sm font-bold">Verify your email</h2>
-          <p className="text-xs text-gray-500 mt-1">
-            We sent a 6-digit OTP to <span className="font-semibold text-gray-700">{email || "your email"}</span>
+          <h2 className="text-sm font-bold text-white">Verify your email</h2>
+          <p className="text-xs text-white/60 mt-1">
+            We sent a 6-digit OTP to <span className="font-semibold text-white">{email || "your email"}</span>
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getSession, clearSession } from "@/lib/session";
@@ -16,6 +16,8 @@ type AuditLog = { id: string; actor_email: string; actor_role: string; action: s
 type Booking = {
   id: string; user_name: string; user_email: string;
   move_in_date: string; message: string; status: string; created_at: string;
+  gov_id_url?: string | null; income_proof_url?: string | null;
+  payment_receipt_url?: string | null; payment_confirmed?: boolean;
   properties: { title: string; location: string; price: string; images: string[] };
 };
 type Review = {
@@ -39,16 +41,16 @@ const navItems = [
 ];
 
 const statusColor: Record<string, string> = {
-  Available: "bg-green-100 text-green-700",
-  Booked:    "bg-blue-100 text-blue-700",
-  Maintenance: "bg-yellow-100 text-yellow-700",
+  Available:   "bg-green-500/30 text-green-200 border border-green-400/30",
+  Booked:      "bg-blue-500/30 text-blue-200 border border-blue-400/30",
+  Maintenance: "bg-yellow-500/30 text-yellow-200 border border-yellow-400/30",
 };
 
 const bookingStatusColor: Record<string, string> = {
-  Pending:   "bg-yellow-100 text-yellow-700",
-  Approved:  "bg-green-100 text-green-700",
-  Rejected:  "bg-red-100 text-red-700",
-  Cancelled: "bg-gray-100 text-gray-500",
+  Pending:   "bg-yellow-500/30 text-yellow-200 border border-yellow-400/30",
+  Approved:  "bg-green-500/30 text-green-200 border border-green-400/30",
+  Rejected:  "bg-red-500/30 text-red-200 border border-red-400/30",
+  Cancelled: "bg-white/10 text-white/50 border border-white/20",
 };
 
 // ── Shared form fields ─────────────────────────────────────
@@ -66,12 +68,12 @@ function PropertyFields({
     <>
       {(["title", "location", "price"] as const).map((field) => (
         <div key={field}>
-          <label className="text-xs font-semibold text-gray-700 capitalize">{field} *</label>
+          <label className="text-xs font-semibold text-white capitalize">{field} *</label>
           <input className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400" value={f[field]} onChange={(e) => setF({ ...f, [field]: e.target.value })} placeholder={field === "price" ? "e.g. ₱25,000/mo" : ""} />
         </div>
       ))}
       <div>
-        <label className="text-xs font-semibold text-gray-700">Status</label>
+        <label className="text-xs font-semibold text-white">Status</label>
         <select className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
           <option>Available</option><option>Booked</option><option>Maintenance</option>
         </select>
@@ -79,7 +81,7 @@ function PropertyFields({
       {/* Assign to landlord — only shown in admin context */}
       {users && (
         <div>
-          <label className="text-xs font-semibold text-gray-700">Assign to Landlord</label>
+          <label className="text-xs font-semibold text-white">Assign to Landlord</label>
           <select
             className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400"
             value={f.landlord_email ?? ""}
@@ -98,17 +100,17 @@ function PropertyFields({
       <div className="grid grid-cols-3 gap-2">
         {(["beds", "baths", "sqm"] as const).map((field) => (
           <div key={field}>
-            <label className="text-xs font-semibold text-gray-700 capitalize">{field}</label>
+            <label className="text-xs font-semibold text-white capitalize">{field}</label>
             <input type="number" min="0" className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400" value={f[field]} onChange={(e) => setF({ ...f, [field]: e.target.value })} />
           </div>
         ))}
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-700">Description</label>
+        <label className="text-xs font-semibold text-white">Description</label>
         <textarea rows={3} className="w-full border rounded px-2 py-1.5 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-gray-400 resize-none" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Optional description..." />
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-700">Images</label>
+        <label className="text-xs font-semibold text-white">Images</label>
         {existingImgs && existingImgs.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2 mt-1">
             {existingImgs.map((src, i) => (
@@ -120,7 +122,7 @@ function PropertyFields({
           </div>
         )}
         <div className="mt-0.5 border-2 border-dashed border-gray-300 rounded-lg p-3 text-center cursor-pointer hover:border-gray-400" onClick={() => fileRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onAddImages(e.dataTransfer.files); }}>
-          <p className="text-xs text-gray-400">Click or drag & drop images</p>
+          <p className="text-xs text-white/60">Click or drag & drop images</p>
           <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onAddImages(e.target.files)} />
         </div>
         {newPreviews.length > 0 && (
@@ -194,7 +196,35 @@ export default function AdminDashboard() {
   type PendingProp = Property & { submitted_by?: string };
   const [pendingProps, setPendingProps]   = useState<PendingProp[]>([]);
 
-  // Announcements
+  // Document viewer modal
+  type DocModal = { name: string; url: string } | null;
+  const [docModal, setDocModal] = useState<DocModal>(null);
+  const [docSignedUrl, setDocSignedUrl] = useState<string | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const [docError, setDocError] = useState("");
+
+  async function openDocModal(name: string, url: string) {
+    setDocModal({ name, url });
+    setDocSignedUrl(null);
+    setDocError("");
+    setDocLoading(true);
+    const res = await fetch("/api/documents/signed-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    setDocLoading(false);
+    if (!res.ok) { setDocError(data.error ?? "Failed to load document."); return; }
+    setDocSignedUrl(data.signedUrl);
+  }
+
+  function closeDocModal() {
+    setDocModal(null);
+    setDocSignedUrl(null);
+    setDocError("");
+  }
+
   type Announcement = { id: string; message: string; type: string; created_at: string };
   const [announcements, setAnnouncements]     = useState<Announcement[]>([]);
   const [announceMsg, setAnnounceMsg]         = useState("");
@@ -301,7 +331,7 @@ export default function AdminDashboard() {
   }
 
   async function handleBookingStatus(id: string, status: string) {
-    const res = await fetch("/api/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+    const res = await fetch("/api/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status, role: "admin" }) });
     if (res.ok) { setBookings((b) => b.map((x) => x.id === id ? { ...x, status } : x)); writeAuditLog("booking_status", id, status); }
   }
 
@@ -441,18 +471,54 @@ export default function AdminDashboard() {
   const topProperties = Object.values(bookingsByProperty).sort((a, b) => b.count - a.count).slice(0, 5);
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-[#800000]">
+
+      {/* ── Document viewer modal ── */}
+      {docModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={closeDocModal}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <p className="text-sm font-extrabold text-white">{docModal.name}</p>
+              <div className="flex items-center gap-3">
+                {docSignedUrl && (
+                  <a href={docSignedUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-600 hover:underline">Open in new tab ↗</a>
+                )}
+                <button onClick={closeDocModal} className="text-white/60 hover:text-white/90 text-lg leading-none">✕</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
+              {docLoading && (
+                <div className="flex flex-col items-center gap-2 text-white/60">
+                  <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  <p className="text-xs">Loading document…</p>
+                </div>
+              )}
+              {!docLoading && docError && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded px-4 py-3">{docError}</p>
+              )}
+              {!docLoading && docSignedUrl && (
+                docModal.url.match(/\.(jpg|jpeg|png|gif|webp)([?#]|$)/i) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={docSignedUrl} alt={docModal.name} className="max-w-full max-h-[70vh] mx-auto rounded-lg" />
+                ) : (
+                  <iframe src={docSignedUrl} className="w-full h-[65vh] rounded-lg border" title={docModal.name} />
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Sidebar ── */}
       <aside className="w-56 bg-gray-900 text-white flex flex-col shrink-0">
         <div className="px-5 py-5 border-b border-gray-700">
           <span className="text-lg font-extrabold">HOME<span className="text-red-500">R</span><span className="text-red-500 italic">ent</span></span>
-          <p className="text-[10px] text-gray-400 mt-0.5">Admin Panel</p>
+          <p className="text-[10px] text-white/60 mt-0.5">Admin Panel</p>
         </div>
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
           {navItems.map((item) => (
             <button key={item.key} onClick={() => setActiveNav(item.key)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-colors ${activeNav === item.key ? "bg-gray-700 text-white" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}>
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-colors ${activeNav === item.key ? "bg-gray-700 text-white" : "text-white/60 hover:bg-gray-800 hover:text-white"}`}>
               <span>{item.icon}</span>{item.label}
               {item.key === "bookings" && pendingBookings > 0 && (
                 <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingBookings}</span>
@@ -466,9 +532,9 @@ export default function AdminDashboard() {
         <div className="px-3 py-4 border-t border-gray-700">
           <div className="flex items-center gap-2 px-3 mb-3">
             <div className="w-7 h-7 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold">{userName.charAt(0).toUpperCase()}</div>
-            <span className="text-xs text-gray-300 truncate">{userName}</span>
+            <span className="text-xs text-white/50 truncate">{userName}</span>
           </div>
-          <button onClick={() => { clearSession(); router.push("/login"); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+          <button onClick={() => { clearSession(); router.push("/login"); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/60 hover:bg-gray-800 hover:text-white transition-colors">
             <span>🚪</span> Logout
           </button>
         </div>
@@ -476,9 +542,9 @@ export default function AdminDashboard() {
 
       {/* ── Main ── */}
       <main className="flex-1 overflow-auto">
-        <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h1 className="text-lg font-extrabold text-gray-800 capitalize">{activeNav}</h1>
-          <span className="text-sm text-gray-500">Welcome, <span className="font-semibold text-gray-700">{userName}</span></span>
+        <div className="bg-white/10 backdrop-blur-sm border-b border-white/10 px-6 py-4 flex items-center justify-between">
+          <h1 className="text-lg font-extrabold text-white capitalize">{activeNav}</h1>
+          <span className="text-sm text-white/70">Welcome, <span className="font-semibold text-white">{userName}</span></span>
         </div>
 
         <div className="p-6">
@@ -489,15 +555,15 @@ export default function AdminDashboard() {
               {/* Stat cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Total Properties", value: properties.length,  icon: "🏠", color: "bg-blue-50 text-blue-600" },
-                  { label: "Total Users",       value: users.length,       icon: "👥", color: "bg-green-50 text-green-600" },
-                  { label: "Total Bookings",    value: bookings.length,    icon: "📋", color: "bg-yellow-50 text-yellow-600" },
-                  { label: "Pending Bookings",  value: pendingBookings,    icon: "🕐", color: "bg-red-50 text-red-600" },
+                  { label: "Total Properties", value: properties.length,  icon: "🏠", color: "bg-blue-500/20 text-blue-300" },
+                  { label: "Total Users",       value: users.length,       icon: "👥", color: "bg-green-500/20 text-green-300" },
+                  { label: "Total Bookings",    value: bookings.length,    icon: "📋", color: "bg-yellow-500/20 text-yellow-300" },
+                  { label: "Pending Bookings",  value: pendingBookings,    icon: "🕐", color: "bg-red-500/20 text-red-300" },
                 ].map((s) => (
-                  <div key={s.label} className="bg-white rounded-xl p-5 shadow-sm border">
+                  <div key={s.label} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl mb-3 ${s.color}`}>{s.icon}</div>
-                    <p className="text-2xl font-extrabold text-gray-800">{s.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                    <p className="text-2xl font-extrabold text-white">{s.value}</p>
+                    <p className="text-xs text-white/70 mt-1">{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -505,23 +571,23 @@ export default function AdminDashboard() {
               {/* Secondary stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Available Props",   value: properties.filter((p) => p.status === "Available").length,  icon: "✅", color: "bg-green-50 text-green-600" },
-                  { label: "Approved Bookings", value: approvedBookings, icon: "📝", color: "bg-blue-50 text-blue-600" },
-                  { label: "Total Reviews",     value: reviews.length,  icon: "⭐", color: "bg-yellow-50 text-yellow-600" },
-                  { label: "Avg Rating",        value: avgRating,       icon: "🏆", color: "bg-purple-50 text-purple-600" },
+                  { label: "Available Props",   value: properties.filter((p) => p.status === "Available").length,  icon: "✅", color: "bg-green-500/20 text-green-300" },
+                  { label: "Approved Bookings", value: approvedBookings, icon: "📝", color: "bg-blue-500/20 text-blue-300" },
+                  { label: "Total Reviews",     value: reviews.length,  icon: "⭐", color: "bg-yellow-500/20 text-yellow-300" },
+                  { label: "Avg Rating",        value: avgRating,       icon: "🏆", color: "bg-purple-500/20 text-purple-300" },
                 ].map((s) => (
-                  <div key={s.label} className="bg-white rounded-xl p-5 shadow-sm border">
+                  <div key={s.label} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl mb-3 ${s.color}`}>{s.icon}</div>
-                    <p className="text-2xl font-extrabold text-gray-800">{s.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                    <p className="text-2xl font-extrabold text-white">{s.value}</p>
+                    <p className="text-xs text-white/70 mt-1">{s.label}</p>
                   </div>
                 ))}
               </div>
 
               {/* Booking status breakdown */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-white rounded-xl shadow-sm border p-5">
-                  <h2 className="text-sm font-extrabold text-gray-800 mb-4">Booking Breakdown</h2>
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+                  <h2 className="text-sm font-extrabold text-white mb-4">Booking Breakdown</h2>
                   {[
                     { label: "Pending",   count: bookings.filter((b) => b.status === "Pending").length,   color: "bg-yellow-400" },
                     { label: "Approved",  count: bookings.filter((b) => b.status === "Approved").length,  color: "bg-green-500" },
@@ -530,44 +596,44 @@ export default function AdminDashboard() {
                   ].map((s) => (
                     <div key={s.label} className="flex items-center gap-3 mb-2">
                       <div className={`w-2.5 h-2.5 rounded-full ${s.color} shrink-0`} />
-                      <span className="text-xs text-gray-600 flex-1">{s.label}</span>
-                      <span className="text-xs font-bold text-gray-800">{s.count}</span>
-                      <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <span className="text-xs text-white/90 flex-1">{s.label}</span>
+                      <span className="text-xs font-bold text-white">{s.count}</span>
+                      <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
                         <div className={`h-full ${s.color} rounded-full`} style={{ width: bookings.length ? `${(s.count / bookings.length) * 100}%` : "0%" }} />
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border p-5">
-                  <h2 className="text-sm font-extrabold text-gray-800 mb-4">Recent Registrations</h2>
-                  {users.slice(0, 5).map((u) => (
-                    <div key={u.id} className="flex items-center gap-3 py-1.5 border-b last:border-0">
-                      <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center text-white text-xs font-bold shrink-0">{u.name?.charAt(0).toUpperCase()}</div>
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+                  <h2 className="text-sm font-extrabold text-white mb-4">Recent Registrations</h2>
+                  {users.slice(0, 5).map((u, i) => (
+                    <div key={u.id} className={`flex items-center gap-3 py-2 px-2 rounded-lg border-b border-white/10 last:border-0 ${i % 2 === 0 ? "bg-white/5" : ""}`}>
+                      <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">{u.name?.charAt(0).toUpperCase()}</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-700 truncate">{u.name}</p>
-                        <p className="text-[10px] text-gray-400 truncate">{u.email}</p>
+                        <p className="text-xs font-bold text-white truncate">{u.name}</p>
+                        <p className="text-[10px] text-white/60 truncate">{u.email}</p>
                       </div>
-                      <span className="text-[10px] text-gray-400">{new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      <span className="text-[10px] text-white/60">{new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                     </div>
                   ))}
-                  {users.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No users yet.</p>}
+                  {users.length === 0 && <p className="text-xs text-white/60 text-center py-4">No users yet.</p>}
                 </div>
               </div>
 
               {/* Recent reviews */}
-              <div className="bg-white rounded-xl shadow-sm border p-5">
-                <h2 className="text-sm font-extrabold text-gray-800 mb-4">Recent Reviews</h2>
-                {reviews.slice(0, 4).length === 0 ? <p className="text-xs text-gray-400 text-center py-4">No reviews yet.</p> : (
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+                <h2 className="text-sm font-extrabold text-white mb-4">Recent Reviews</h2>
+                {reviews.slice(0, 4).length === 0 ? <p className="text-xs text-white/60 text-center py-4">No reviews yet.</p> : (
                   <div className="grid sm:grid-cols-2 gap-3">
                     {reviews.slice(0, 4).map((r) => (
-                      <div key={r.id} className="border rounded-lg p-3">
+                      <div key={r.id} className="border border-white/20 rounded-lg p-3">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <p className="text-xs font-bold text-gray-800">{r.user_name}</p>
+                          <p className="text-xs font-bold text-white">{r.user_name}</p>
                           <Stars rating={r.rating} />
                         </div>
-                        <p className="text-[10px] text-gray-400 mb-1">{r.properties?.title}</p>
-                        {r.comment && <p className="text-xs text-gray-500 line-clamp-2">{r.comment}</p>}
+                        <p className="text-[10px] text-white/60 mb-1">{r.properties?.title}</p>
+                        {r.comment && <p className="text-xs text-white/70 line-clamp-2">{r.comment}</p>}
                       </div>
                     ))}
                   </div>
@@ -578,91 +644,139 @@ export default function AdminDashboard() {
 
           {/* ── Properties ── */}
           {activeNav === "properties" && (
-            <div className="bg-white rounded-xl shadow-sm border p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-extrabold text-gray-800">All Properties ({properties.length})</h2>
-                <button onClick={() => { setShowAdd(true); setAddError(""); }} className="bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-700">+ Add Property</button>
+            <div className="flex flex-col gap-5">
+              {/* Header */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h2 className="text-lg font-extrabold text-white">All Properties</h2>
+                  <p className="text-xs text-white/60 mt-0.5">{properties.length} listing{properties.length !== 1 ? "s" : ""} total</p>
+                </div>
+                <button onClick={() => { setShowAdd(true); setAddError(""); }} className="flex items-center gap-2 bg-white/20 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-white/30 border border-white/20 transition-colors">
+                  <span className="text-base leading-none">+</span> Add Property
+                </button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="text-gray-400 border-b">
-                    <th className="text-left pb-2 font-semibold">Property</th>
-                    <th className="text-left pb-2 font-semibold">Location</th>
-                    <th className="text-left pb-2 font-semibold">Price</th>
-                    <th className="text-left pb-2 font-semibold">Landlord</th>
-                    <th className="text-left pb-2 font-semibold">Status</th>
-                    <th className="text-left pb-2 font-semibold">Actions</th>
-                  </tr></thead>
-                  <tbody>
-                    {properties.map((p) => (
-                      <tr key={p.id} className="border-b last:border-0">
-                        <td className="py-2.5 flex items-center gap-2">
-                          {p.images?.[0] && <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0"><Image src={p.images[0]} alt={p.title} fill sizes="32px" className="object-cover" /></div>}
-                          <span className="font-medium text-gray-700 truncate max-w-[100px]">{p.title}</span>
-                        </td>
-                        <td className="py-2.5 text-gray-500 max-w-[80px] truncate">{p.location}</td>
-                        <td className="py-2.5 font-semibold text-gray-700">{p.price}</td>
-                        <td className="py-2.5 text-gray-400 max-w-[80px] truncate">{p.landlord_name || "—"}</td>
-                        <td className="py-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor[p.status] ?? "bg-gray-100 text-gray-600"}`}>{p.status}</span></td>
-                        <td className="py-2.5">
-                          <div className="flex gap-3">
-                            <button onClick={() => openEdit(p)} className="text-blue-500 hover:underline font-semibold">Edit</button>
-                            <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:underline font-semibold">Delete</button>
+
+              {/* Cards grid */}
+              {properties.length === 0 ? (
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-12 text-center text-white/60">
+                  <p className="text-3xl mb-3">🏠</p>
+                  <p className="text-sm font-semibold">No properties yet</p>
+                  <p className="text-xs mt-1">Click + Add Property to create the first listing.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {properties.map((p) => (
+                    <div key={p.id} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl overflow-hidden hover:bg-white/20 transition-colors group">
+                      {/* Image */}
+                      <div className="relative h-36 bg-white/10">
+                        {p.images?.[0] ? (
+                          <Image src={p.images[0]} alt={p.title} fill sizes="300px" className="object-cover group-hover:scale-105 transition-transform duration-300" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white/50 text-xs">No image</div>
+                        )}
+                        {/* Status badge */}
+                        <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor[p.status] ?? "bg-gray-100 text-white/90"}`}>
+                          {p.status}
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-3">
+                        <h3 className="text-sm font-extrabold text-white truncate mb-0.5">{p.title}</h3>
+                        <div className="flex items-center gap-1 text-white/60 mb-2">
+                          <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="text-[10px] text-white/70 truncate">{p.location}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-extrabold text-white">{p.price}</span>
+                          {(p.beds != null || p.baths != null) && (
+                            <span className="text-[10px] text-white/60">
+                              {p.beds != null && `🛏 ${p.beds}`}
+                              {p.beds != null && p.baths != null && " · "}
+                              {p.baths != null && `🚿 ${p.baths}`}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Landlord */}
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold text-white/70 shrink-0">
+                            {(p.landlord_name ?? "?").charAt(0).toUpperCase()}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {properties.length === 0 && <tr><td colSpan={6} className="py-8 text-center text-gray-400">No properties yet.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+                          <span className="text-[10px] text-white/60 truncate">{p.landlord_name || "Unassigned"}</span>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openEdit(p)}
+                            className="flex-1 text-xs font-bold py-1.5 rounded-lg border border-gray-200 text-white hover:bg-gray-50 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(p.id)}
+                            className="flex-1 text-xs font-bold py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* ── Users ── */}
           {activeNav === "users" && (
-            <div className="bg-white rounded-xl shadow-sm border p-5">
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-                <h2 className="text-sm font-extrabold text-gray-800">All Users ({users.length})</h2>
+                <h2 className="text-sm font-extrabold text-white">All Users ({users.length})</h2>
                 <div className="flex gap-2">
                   <input className="border rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-gray-300 w-48" placeholder="Search name or email..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
                   <button onClick={() => exportCSV("users")} className="border text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-50">⬇️ CSV</button>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mb-4">Change a user&apos;s role to <strong>landlord</strong> to grant them access to the Landlord Dashboard.</p>
+              <p className="text-xs text-white/60 mb-4">Change a user&apos;s role to <strong>landlord</strong> to grant them access to the Landlord Dashboard.</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead><tr className="text-gray-400 border-b">
-                    <th className="text-left pb-2 font-semibold">User</th>
-                    <th className="text-left pb-2 font-semibold">Email</th>
-                    <th className="text-left pb-2 font-semibold">Role</th>
-                    <th className="text-left pb-2 font-semibold">Verified</th>
-                    <th className="text-left pb-2 font-semibold">Joined</th>
-                    <th className="text-left pb-2 font-semibold">Change Role</th>
-                    <th className="text-left pb-2 font-semibold">Ban</th>
+                  <thead><tr className="text-white/60 border-b">
+                    <th className="text-left pb-2 font-semibold text-white/70">User</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Email</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Role</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Verified</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Joined</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Change Role</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Ban</th>
                   </tr></thead>
                   <tbody>
                     {filteredUsers.map((u) => (
-                      <tr key={u.id} className="border-b last:border-0">
+                      <tr key={u.id} className="border-b border-white/10 last:border-0">
                         <td className="py-2.5 flex items-center gap-2">
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${u.role === "landlord" ? "bg-blue-600" : u.role === "admin" ? "bg-red-600" : "bg-gray-700"}`}>
                             {u.name?.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-medium text-gray-700">{u.name}</span>
+                          <span className="font-medium text-white">{u.name}</span>
                         </td>
-                        <td className="py-2.5 text-gray-500">{u.email}</td>
+                        <td className="py-2.5 text-white/70">{u.email}</td>
                         <td className="py-2.5">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             u.role === "landlord" ? "bg-blue-100 text-blue-700"
                             : u.role === "admin"  ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-600"
+                            : "bg-gray-100 text-white/90"
                           }`}>{u.role}</span>
                         </td>
-                        <td className="py-2.5">{u.is_verified ? <span className="text-green-600 font-bold">✅</span> : <span className="text-gray-400">—</span>}</td>
-                        <td className="py-2.5 text-gray-500">{new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
+                        <td className="py-2.5">{u.is_verified ? <span className="text-green-600 font-bold">✅</span> : <span className="text-white/60">—</span>}</td>
+                        <td className="py-2.5 text-white/70">{new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
                         <td className="py-2.5">
                           {u.email === "admin@homerent.ph" ? (
-                            <span className="text-[10px] text-gray-400 italic">Protected</span>
+                            <span className="text-[10px] text-white/60 italic">Protected</span>
                           ) : (
                             <select
                               disabled={updatingRole === u.id}
@@ -691,7 +805,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ))}
-                    {filteredUsers.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-gray-400">No users found.</td></tr>}
+                    {filteredUsers.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-white/60">No users found.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -700,92 +814,192 @@ export default function AdminDashboard() {
 
           {/* ── Bookings ── */}
           {activeNav === "bookings" && (
-            <div className="bg-white rounded-xl shadow-sm border p-5">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-                <h2 className="text-sm font-extrabold text-gray-800">All Bookings ({bookings.length})</h2>
+            <div className="flex flex-col gap-5">
+              {/* Header */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h2 className="text-lg font-extrabold text-white">All Bookings</h2>
+                  <p className="text-xs text-white/60 mt-0.5">{bookings.length} total · {bookings.filter((b) => b.status === "Pending").length} pending review</p>
+                </div>
                 <div className="flex gap-2">
-                  <select className="border rounded-lg px-3 py-1.5 text-xs bg-white outline-none focus:ring-1 focus:ring-gray-300" value={bookingFilter} onChange={(e) => setBookingFilter(e.target.value)}>
-                    <option value="All">All</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                  <button onClick={() => exportCSV("bookings")} className="border text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-50">⬇️ CSV</button>
+                  {["All","Pending","Approved","Rejected","Cancelled"].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setBookingFilter(f)}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${
+                        bookingFilter === f
+                          ? "bg-gray-900 text-white border-gray-900"
+                          : "bg-white text-white/70 border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      {f}
+                      {f !== "All" && (
+                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${bookingFilter === f ? "bg-white/20 text-white" : "bg-gray-100 text-white/70"}`}>
+                          {bookings.filter((b) => b.status === f).length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                  <button onClick={() => exportCSV("bookings")} className="flex items-center gap-1.5 border text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-gray-50 text-white/90">
+                    ⬇️ CSV
+                  </button>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead><tr className="text-gray-400 border-b">
-                    <th className="text-left pb-2 font-semibold">Property</th>
-                    <th className="text-left pb-2 font-semibold">Tenant</th>
-                    <th className="text-left pb-2 font-semibold">Move-in</th>
-                    <th className="text-left pb-2 font-semibold">Status</th>
-                    <th className="text-left pb-2 font-semibold">Actions</th>
-                  </tr></thead>
-                  <tbody>
-                    {filteredBookings.map((b) => (
-                      <tr key={b.id} className="border-b last:border-0">
-                        <td className="py-2.5">
-                          <p className="font-medium text-gray-700">{b.properties?.title ?? "—"}</p>
-                          <p className="text-gray-400">{b.properties?.location}</p>
-                        </td>
-                        <td className="py-2.5">
-                          <p className="font-medium text-gray-700">{b.user_name}</p>
-                          <p className="text-gray-400">{b.user_email}</p>
-                        </td>
-                        <td className="py-2.5 text-gray-500">{new Date(b.move_in_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
-                        <td className="py-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${bookingStatusColor[b.status] ?? "bg-gray-100 text-gray-600"}`}>{b.status}</span></td>
-                        <td className="py-2.5">
-                          {b.status === "Pending" ? (
-                            <div className="flex gap-2">
-                              <button onClick={() => handleBookingStatus(b.id, "Approved")} className="text-green-600 hover:underline font-semibold">Approve</button>
-                              <button onClick={() => handleBookingStatus(b.id, "Rejected")} className="text-red-500 hover:underline font-semibold">Reject</button>
-                            </div>
-                          ) : <span className="text-gray-400">—</span>}
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredBookings.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-gray-400">No {bookingFilter !== "All" ? bookingFilter.toLowerCase() + " " : ""}bookings.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+
+              {/* Cards */}
+              {filteredBookings.length === 0 ? (
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-12 text-center text-white/60">
+                  <p className="text-3xl mb-3">📋</p>
+                  <p className="text-sm font-semibold">No {bookingFilter !== "All" ? bookingFilter.toLowerCase() + " " : ""}bookings</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {filteredBookings.map((b) => (
+                    <div key={b.id} className={`bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 flex flex-col gap-3 ${b.status === "Pending" ? "border-yellow-300" : ""}`}>
+                      {/* Top row */}
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          {/* Tenant avatar */}
+                          <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center text-white text-sm font-extrabold shrink-0">
+                            {b.user_name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-extrabold text-white">{b.user_name}</p>
+                            <p className="text-[10px] text-white/60">{b.user_email}</p>
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${bookingStatusColor[b.status] ?? "bg-gray-100 text-white/90"}`}>
+                          {b.status}
+                        </span>
+                      </div>
+
+                      {/* Property + dates */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 rounded-lg p-3">
+                        <div>
+                          <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wide mb-0.5">Property</p>
+                          <p className="text-xs font-bold text-white leading-snug">{b.properties?.title ?? "—"}</p>
+                          <p className="text-[10px] text-white/60 truncate">{b.properties?.location}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wide mb-0.5">Move-in</p>
+                          <p className="text-xs font-bold text-white">{new Date(b.move_in_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wide mb-0.5">Submitted</p>
+                          <p className="text-xs font-bold text-white">{new Date(b.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wide mb-0.5">Rent</p>
+                          <p className="text-xs font-bold text-white">{b.properties?.price ?? "—"}</p>
+                        </div>
+                      </div>
+
+                      {/* Bottom row: documents + actions */}
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        {/* Document badges */}
+                        <div className="flex gap-2">
+                          {b.gov_id_url ? (
+                            <button
+                              onClick={() => openDocModal(`Gov ID — ${b.user_name}`, b.gov_id_url!)}
+                              className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold px-2.5 py-1 rounded-lg hover:bg-blue-100 transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" /></svg>
+                              Gov ID
+                            </button>
+                          ) : (
+                            <span className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-white/60 text-[10px] font-semibold px-2.5 py-1 rounded-lg">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" /></svg>
+                              No Gov ID
+                            </span>
+                          )}
+                          {b.income_proof_url ? (
+                            <button
+                              onClick={() => openDocModal(`Income Proof — ${b.user_name}`, b.income_proof_url!)}
+                              className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 text-[10px] font-bold px-2.5 py-1 rounded-lg hover:bg-green-100 transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              Income Proof
+                            </button>
+                          ) : (
+                            <span className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-white/60 text-[10px] font-semibold px-2.5 py-1 rounded-lg">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              No Income Proof
+                            </span>
+                          )}
+                          {b.payment_receipt_url ? (
+                            <button
+                              onClick={() => openDocModal(`Receipt — ${b.user_name}`, b.payment_receipt_url!)}
+                              className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-[10px] font-bold px-2.5 py-1 rounded-lg hover:bg-purple-100 transition-colors"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                              {b.payment_confirmed ? "Receipt ✓" : "Receipt"}
+                            </button>
+                          ) : (
+                            <span className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-white/60 text-[10px] font-semibold px-2.5 py-1 rounded-lg">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                              No Receipt
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        {b.status === "Pending" && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleBookingStatus(b.id, "Approved")}
+                              className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition-colors"
+                            >
+                              ✅ Approve
+                            </button>
+                            <button
+                              onClick={() => handleBookingStatus(b.id, "Rejected")}
+                              className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition-colors"
+                            >
+                              ❌ Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* ── Reviews ── */}
           {activeNav === "reviews" && (
-            <div className="bg-white rounded-xl shadow-sm border p-5">
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
               <div className="flex items-center justify-between mb-2 flex-wrap gap-3">
-                <h2 className="text-sm font-extrabold text-gray-800">All Reviews ({reviews.length})</h2>
+                <h2 className="text-sm font-extrabold text-white">All Reviews ({reviews.length})</h2>
                 <input className="border rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-gray-300 w-48" placeholder="Search reviewer or property..." value={reviewSearch} onChange={(e) => setReviewSearch(e.target.value)} />
               </div>
               {reviews.length > 0 && (
-                <p className="text-xs text-gray-400 mb-4">Average rating: <span className="font-bold text-gray-700">{avgRating} / 5</span></p>
+                <p className="text-xs text-white/60 mb-4">Average rating: <span className="font-bold text-white">{avgRating} / 5</span></p>
               )}
               <div className="flex flex-col divide-y">
                 {filteredReviews.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-8">No reviews found.</p>
+                  <p className="text-xs text-white/60 text-center py-8">No reviews found.</p>
                 ) : filteredReviews.map((r) => (
                   <div key={r.id} className="py-4 first:pt-0">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white text-xs font-bold shrink-0">{r.user_name?.charAt(0).toUpperCase()}</div>
                         <div>
-                          <p className="text-xs font-bold text-gray-800">{r.user_name}</p>
-                          <p className="text-[10px] text-gray-400">{r.user_email}</p>
+                          <p className="text-xs font-bold text-white">{r.user_name}</p>
+                          <p className="text-[10px] text-white/60">{r.user_email}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div>
                           <Stars rating={r.rating} />
-                          <p className="text-[10px] text-gray-400 mt-0.5">{r.properties?.title}</p>
+                          <p className="text-[10px] text-white/60 mt-0.5">{r.properties?.title}</p>
                         </div>
-                        <div className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                        <div className="text-[10px] text-white/60">{new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
                         <button onClick={() => handleDeleteReview(r.id, r.user_email)} className="text-red-400 hover:underline text-[10px] font-semibold">Delete</button>
                       </div>
                     </div>
-                    {r.comment && <p className="text-xs text-gray-600 mt-2 ml-10 leading-relaxed">{r.comment}</p>}
+                    {r.comment && <p className="text-xs text-white/90 mt-2 ml-10 leading-relaxed">{r.comment}</p>}
                   </div>
                 ))}
               </div>
@@ -797,29 +1011,29 @@ export default function AdminDashboard() {
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {[
-                  { label: "Total Bookings",    value: bookings.length,         icon: "📋", color: "bg-blue-50 text-blue-600" },
-                  { label: "Approved Bookings", value: approvedBookings,         icon: "✅", color: "bg-green-50 text-green-600" },
-                  { label: "Est. Revenue",       value: `₱${totalRevenue.toLocaleString()}`, icon: "💰", color: "bg-yellow-50 text-yellow-600" },
+                  { label: "Total Bookings",    value: bookings.length,         icon: "📋", color: "bg-blue-500/20 text-blue-300" },
+                  { label: "Approved Bookings", value: approvedBookings,         icon: "✅", color: "bg-green-500/20 text-green-300" },
+                  { label: "Est. Revenue",       value: `₱${totalRevenue.toLocaleString()}`, icon: "💰", color: "bg-yellow-500/20 text-yellow-300" },
                 ].map((s) => (
-                  <div key={s.label} className="bg-white rounded-xl p-5 shadow-sm border">
+                  <div key={s.label} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl mb-3 ${s.color}`}>{s.icon}</div>
-                    <p className="text-2xl font-extrabold text-gray-800">{s.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                    <p className="text-2xl font-extrabold text-white">{s.value}</p>
+                    <p className="text-xs text-white/70 mt-1">{s.label}</p>
                   </div>
                 ))}
               </div>
-              <div className="bg-white rounded-xl shadow-sm border p-5">
-                <h2 className="text-sm font-extrabold text-gray-800 mb-4">Most Booked Properties</h2>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+                <h2 className="text-sm font-extrabold text-white mb-4">Most Booked Properties</h2>
                 {topProperties.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-6">No booking data yet.</p>
+                  <p className="text-xs text-white/60 text-center py-6">No booking data yet.</p>
                 ) : (
                   <div className="flex flex-col gap-3">
                     {topProperties.map((p, i) => (
                       <div key={i} className="flex items-center gap-3">
-                        <span className="text-xs font-extrabold text-gray-400 w-5">#{i + 1}</span>
-                        <span className="flex-1 text-xs font-semibold text-gray-700 truncate">{p.title}</span>
-                        <span className="text-xs font-bold text-gray-800">{p.count} booking{p.count !== 1 ? "s" : ""}</span>
-                        <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <span className="text-xs font-extrabold text-white/60 w-5">#{i + 1}</span>
+                        <span className="flex-1 text-xs font-semibold text-white truncate">{p.title}</span>
+                        <span className="text-xs font-bold text-white">{p.count} booking{p.count !== 1 ? "s" : ""}</span>
+                        <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
                           <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(p.count / (topProperties[0]?.count || 1)) * 100}%` }} />
                         </div>
                       </div>
@@ -827,17 +1041,17 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
-              <div className="bg-white rounded-xl shadow-sm border p-5">
-                <h2 className="text-sm font-extrabold text-gray-800 mb-4">Booking Status Breakdown</h2>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+                <h2 className="text-sm font-extrabold text-white mb-4">Booking Status Breakdown</h2>
                 {["Pending","Approved","Rejected","Cancelled"].map((s) => {
                   const count = bookings.filter((b) => b.status === s).length;
                   const colors: Record<string,string> = { Pending:"bg-yellow-400", Approved:"bg-green-500", Rejected:"bg-red-500", Cancelled:"bg-gray-400" };
                   return (
                     <div key={s} className="flex items-center gap-3 mb-2">
                       <div className={`w-2.5 h-2.5 rounded-full ${colors[s]} shrink-0`} />
-                      <span className="text-xs text-gray-600 flex-1">{s}</span>
-                      <span className="text-xs font-bold text-gray-800">{count}</span>
-                      <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <span className="text-xs text-white/90 flex-1">{s}</span>
+                      <span className="text-xs font-bold text-white">{count}</span>
+                      <div className="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
                         <div className={`h-full ${colors[s]} rounded-full`} style={{ width: bookings.length ? `${(count/bookings.length)*100}%` : "0%" }} />
                       </div>
                     </div>
@@ -849,32 +1063,32 @@ export default function AdminDashboard() {
 
           {/* ── Audit Logs ── */}
           {activeNav === "audit" && (
-            <div className="bg-white rounded-xl shadow-sm border p-5">
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-                <h2 className="text-sm font-extrabold text-gray-800">Audit Logs ({auditLogs.length})</h2>
+                <h2 className="text-sm font-extrabold text-white">Audit Logs ({auditLogs.length})</h2>
                 <input className="border rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-gray-300 w-56" placeholder="Search email, action, target..." value={auditSearch} onChange={(e) => setAuditSearch(e.target.value)} />
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead><tr className="text-gray-400 border-b">
-                    <th className="text-left pb-2 font-semibold">Time</th>
-                    <th className="text-left pb-2 font-semibold">Actor</th>
-                    <th className="text-left pb-2 font-semibold">Role</th>
-                    <th className="text-left pb-2 font-semibold">Action</th>
-                    <th className="text-left pb-2 font-semibold">Target</th>
-                    <th className="text-left pb-2 font-semibold">Details</th>
+                  <thead><tr className="text-white/60 border-b">
+                    <th className="text-left pb-2 font-semibold text-white/70">Time</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Actor</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Role</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Action</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Target</th>
+                    <th className="text-left pb-2 font-semibold text-white/70">Details</th>
                   </tr></thead>
                   <tbody>
                     {filteredAudit.length === 0 ? (
-                      <tr><td colSpan={6} className="py-8 text-center text-gray-400">No logs found.</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-white/60">No logs found.</td></tr>
                     ) : filteredAudit.map((l) => (
-                      <tr key={l.id} className="border-b last:border-0">
-                        <td className="py-2 text-gray-400 whitespace-nowrap">{new Date(l.created_at).toLocaleString("en-US", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" })}</td>
-                        <td className="py-2 font-medium text-gray-700">{l.actor_email}</td>
-                        <td className="py-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ l.actor_role==="admin" ? "bg-red-100 text-red-700" : l.actor_role==="landlord" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600" }`}>{l.actor_role}</span></td>
-                        <td className="py-2 font-mono text-gray-600">{l.action}</td>
-                        <td className="py-2 text-gray-500 max-w-[120px] truncate">{l.target ?? "—"}</td>
-                        <td className="py-2 text-gray-400 max-w-[120px] truncate">{l.details ?? "—"}</td>
+                      <tr key={l.id} className="border-b border-white/10 last:border-0">
+                        <td className="py-2 text-white/60 whitespace-nowrap">{new Date(l.created_at).toLocaleString("en-US", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" })}</td>
+                        <td className="py-2 font-medium text-white">{l.actor_email}</td>
+                        <td className="py-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ l.actor_role==="admin" ? "bg-red-100 text-red-700" : l.actor_role==="landlord" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-white/90" }`}>{l.actor_role}</span></td>
+                        <td className="py-2 font-mono text-white/90">{l.action}</td>
+                        <td className="py-2 text-white/70 max-w-[120px] truncate">{l.target ?? "—"}</td>
+                        <td className="py-2 text-white/60 max-w-[120px] truncate">{l.details ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -885,21 +1099,21 @@ export default function AdminDashboard() {
 
           {/* ── Approvals ── */}
           {activeNav === "approvals" && (
-            <div className="bg-white rounded-xl shadow-sm border p-5">
-              <h2 className="text-sm font-extrabold text-gray-800 mb-4">Pending Property Approvals ({pendingApprovals})</h2>
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+              <h2 className="text-sm font-extrabold text-white mb-4">Pending Property Approvals ({pendingApprovals})</h2>
               {pendingProps.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-8">No pending submissions.</p>
+                <p className="text-xs text-white/60 text-center py-8">No pending submissions.</p>
               ) : (
                 <div className="flex flex-col gap-4">
                   {pendingProps.map((p) => (
                     <div key={p.id} className="border rounded-xl overflow-hidden flex flex-col sm:flex-row">
-                      <div className="relative w-full sm:w-32 h-28 shrink-0 bg-gray-100">
-                        {p.images?.[0] ? <Image src={p.images[0]} alt={p.title} fill sizes="128px" className="object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">No img</div>}
+                      <div className="relative w-full sm:w-32 h-28 shrink-0 bg-white/10">
+                        {p.images?.[0] ? <Image src={p.images[0]} alt={p.title} fill sizes="128px" className="object-cover" /> : <div className="w-full h-full flex items-center justify-center text-white/50 text-xs">No img</div>}
                       </div>
                       <div className="flex-1 p-4">
-                        <p className="text-xs font-extrabold text-gray-800">{p.title}</p>
-                        <p className="text-[10px] text-gray-400 mb-1">{p.location} &bull; {p.price}</p>
-                        <p className="text-[10px] text-gray-500 mb-3">Submitted by: {p.landlord_name || p.landlord_email || "—"}</p>
+                        <p className="text-xs font-extrabold text-white">{p.title}</p>
+                        <p className="text-[10px] text-white/60 mb-1">{p.location} &bull; {p.price}</p>
+                        <p className="text-[10px] text-white/70 mb-3">Submitted by: {p.landlord_name || p.landlord_email || "—"}</p>
                         <div className="flex gap-2">
                           <button onClick={() => handleApproveProperty(p.id)} className="bg-green-500 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-green-600">✅ Approve</button>
                           <button onClick={() => handleRejectProperty(p.id)} className="bg-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-red-600">❌ Reject</button>
@@ -915,8 +1129,8 @@ export default function AdminDashboard() {
           {/* ── Announcements ── */}
           {activeNav === "announce" && (
             <div className="flex flex-col gap-5">
-              <div className="bg-white rounded-xl shadow-sm border p-5">
-                <h2 className="text-sm font-extrabold text-gray-800 mb-4">Post Announcement</h2>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+                <h2 className="text-sm font-extrabold text-white mb-4">Post Announcement</h2>
                 <form onSubmit={handlePostAnnouncement} className="flex flex-col gap-3">
                   <textarea
                     rows={3}
@@ -937,10 +1151,10 @@ export default function AdminDashboard() {
                   </div>
                 </form>
               </div>
-              <div className="bg-white rounded-xl shadow-sm border p-5">
-                <h2 className="text-sm font-extrabold text-gray-800 mb-4">Active Announcements ({announcements.length})</h2>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5">
+                <h2 className="text-sm font-extrabold text-white mb-4">Active Announcements ({announcements.length})</h2>
                 {announcements.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-6">No announcements yet.</p>
+                  <p className="text-xs text-white/60 text-center py-6">No announcements yet.</p>
                 ) : (
                   <div className="flex flex-col gap-3">
                     {announcements.map((a) => {
@@ -969,8 +1183,8 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="text-sm font-extrabold text-gray-800">Add New Property</h2>
-              <button onClick={() => { setShowAdd(false); setAddForm(emptyForm); setAddFiles([]); setAddPreviews([]); }} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+              <h2 className="text-sm font-extrabold text-white">Add New Property</h2>
+              <button onClick={() => { setShowAdd(false); setAddForm(emptyForm); setAddFiles([]); setAddPreviews([]); }} className="text-white/60 hover:text-white/90 text-lg">✕</button>
             </div>
             <form onSubmit={handleAdd} className="p-5 flex flex-col gap-3">
               {addError && <p className="text-red-500 text-xs bg-red-50 border border-red-200 rounded px-3 py-2">{addError}</p>}
@@ -989,8 +1203,8 @@ export default function AdminDashboard() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="text-sm font-extrabold text-gray-800">Edit Property</h2>
-              <button onClick={() => setEditProp(null)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+              <h2 className="text-sm font-extrabold text-white">Edit Property</h2>
+              <button onClick={() => setEditProp(null)} className="text-white/60 hover:text-white/90 text-lg">✕</button>
             </div>
             <form onSubmit={handleEdit} className="p-5 flex flex-col gap-3">
               {editError && <p className="text-red-500 text-xs bg-red-50 border border-red-200 rounded px-3 py-2">{editError}</p>}

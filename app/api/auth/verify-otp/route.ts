@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
 
   const { data: user, error } = await supabase
     .from("userss")
-    .select("id, name, otp, otp_expires, is_verified, role")
+    .select("id, name, otp, otp_expires, is_verified, role, avatar_url")
     .eq("email", email)
     .single();
 
@@ -31,5 +31,5 @@ export async function POST(req: NextRequest) {
     .update({ otp: null, otp_expires: null, is_verified: true })
     .eq("email", email);
 
-  return NextResponse.json({ message: "Verified successfully.", name: user.name, role: user.role });
+  return NextResponse.json({ message: "Verified successfully.", name: user.name, role: user.role, avatar_url: user.avatar_url ?? null });
 }

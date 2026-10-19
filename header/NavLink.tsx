@@ -16,10 +16,10 @@ export default function NavLink({ href, label, onClick }: NavLinkProps) {
     <Link
       href={href}
       onClick={onClick}
-      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+      className={`px-4 py-2 rounded-lg text-base font-bold transition-colors ${
         isActive
-          ? "bg-gray-100 text-gray-900"
-          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+          ? "bg-white/20 text-white"
+          : "text-white/80 hover:bg-white/10 hover:text-white"
       }`}
     >
       {label}

@@ -67,6 +67,9 @@ export default function ProfilePage() {
     setProfile((p) => p ? { ...p, avatar_url: data.avatar_url } : p);
     setAvatarPreview(null);
     setAvatarFile(null);
+    // Persist new avatar URL in session so header reflects it immediately
+    const s = getSession();
+    if (s) setSession({ ...s, avatar_url: data.avatar_url });
     setSaveSuccess("Avatar updated!");
     setTimeout(() => setSaveSuccess(""), 3000);
   }
@@ -119,7 +122,7 @@ export default function ProfilePage() {
   const initials = profile.name?.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) ?? "?";
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-[#800000]">
       <div className="max-w-xl mx-auto px-4 py-10">
         <div className="mb-6">
           <h1 className="text-2xl font-extrabold text-gray-800">My Profile</h1>

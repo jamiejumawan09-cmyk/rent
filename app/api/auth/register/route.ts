@@ -9,7 +9,7 @@ function generateOtp() {
 }
 
 export async function POST(req: NextRequest) {
-  const { name, email, password } = await req.json();
+  const { name, email, phone, password } = await req.json();
   const supabase = getSupabaseAdmin();
 
   const { data: existing } = await supabase
@@ -28,12 +28,12 @@ export async function POST(req: NextRequest) {
   if (existing) {
     const { error } = await supabase
       .from("userss")
-      .update({ name, password_hash: password, otp, otp_expires, is_verified: false })
+      .update({ name, phone: phone?.trim() || null, password_hash: password, otp, otp_expires, is_verified: false })
       .eq("email", email);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   } else {
     const { error } = await supabase.from("userss").insert({
-      name, email, password_hash: password, role: "user", is_verified: false, otp, otp_expires,
+      name, email, phone: phone?.trim() || null, password_hash: password, role: "user", is_verified: false, otp, otp_expires,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
