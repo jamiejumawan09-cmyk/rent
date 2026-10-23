@@ -16,16 +16,31 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin();
-  const { message, type } = await req.json();
+  const { message, type, posted_by } = await req.json();
   if (!message?.trim()) return NextResponse.json({ error: "Message required" }, { status: 400 });
 
   const { data, error } = await supabase
     .from("announcements")
-    .insert({ message: message.trim(), type: type ?? "info" })
+    .insert({ message: message.trim(), type: type ?? "info", posted_by: posted_by?.trim() || "Admin" })
     .select()
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notify all users about the announcement
+  const icon = type === "warning" ? "⚠️" : type === "success" ? "✅" : "ℹ️";
+  const { data: users } = await supabase.from("users").select("email");
+  if (users?.length) {
+    const notifs = users.map((u: { email: string }) => ({
+      user_email: u.email,
+      message: `${icon} Announcement: ${message.trim()}`,
+      type: type === "warning" ? "error" : type === "success" ? "success" : "info",
+      is_read: false,
+      link: "/home",
+    }));
+    await supabase.from("notifications").insert(notifs);
+  }
+
   return NextResponse.json(data);
 }
 

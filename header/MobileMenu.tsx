@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookMarked, Heart, LogOut, Home, Building2, Map, SlidersHorizontal, Info, Mail } from "lucide-react";
+import { BookMarked, Heart, MessageCircle, LogOut, Home, Building2, Map, SlidersHorizontal, Info, Mail } from "lucide-react";
 import { clearSession } from "@/lib/session";
 import NavLink from "./NavLink";
 
@@ -25,6 +25,7 @@ const moreLinks = [
 const authLinks = [
   { href: "/bookings",  label: "My Bookings", icon: BookMarked },
   { href: "/favorites", label: "Favorites",   icon: Heart },
+  { href: "/messages",  label: "Messages",    icon: MessageCircle },
 ];
 
 export default function MobileMenu({ userName, onClose }: MobileMenuProps) {
@@ -80,7 +81,7 @@ export default function MobileMenu({ userName, onClose }: MobileMenuProps) {
         {userName ? (
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors w-full text-left"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-lime-500 hover:bg-red-50 transition-colors w-full text-left"
           >
             <LogOut className="w-4 h-4" />
             Logout
@@ -97,7 +98,7 @@ export default function MobileMenu({ userName, onClose }: MobileMenuProps) {
             <Link
               href="/register"
               onClick={onClose}
-              className="flex-1 text-center px-3 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors"
+              className="flex-1 text-center px-3 py-2 rounded-lg text-sm font-medium text-white bg-lime-500 hover:bg-lime-600 transition-colors"
             >
               Sign up
             </Link>

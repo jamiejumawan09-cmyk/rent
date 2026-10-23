@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from("bookings")
-    .select("*, properties(title, location, price, images)")
+    .select("*, properties(title, location, price, images, landlord_email, landlord_name)")
     .order("created_at", { ascending: false });
 
   if (email) query = query.eq("user_email", email);
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       move_in_date,
       move_out_date:      move_out_date      || null,
       message,
-      payment_method:     payment_method     ?? "Cash",
+      payment_method:     payment_method     ?? "GCash",
       lease_duration:     lease_duration     || null,
       occupants:          occupants          ? Number(occupants) : null,
       introduction:       introduction       || null,
@@ -159,7 +159,7 @@ export async function PATCH(req: NextRequest) {
   // ── Security: fetch the booking first ───────────────────
   const { data: booking, error: fetchError } = await supabase
     .from("bookings")
-    .select("id, user_email, status, property_id, properties(title, landlord_email)")
+    .select("id, user_email, status, property_id, payment_method, payment_receipt_url, moved_in, properties(title, landlord_email)")
     .eq("id", id)
     .single();
 
@@ -171,21 +171,30 @@ export async function PATCH(req: NextRequest) {
   const landlordEmail = (booking.properties as { landlord_email?: string } | null)?.landlord_email;
   const isLandlord = user_email && landlordEmail === user_email;
 
-  // ── Cancellation: tenant can only cancel Pending bookings ─
+  // ── Cancellation: tenant can cancel Pending or Approved bookings ─
   if (status === "Cancelled") {
     if (!isTenant && !isAdmin)
       return NextResponse.json({ error: "Only the tenant or admin can cancel a booking." }, { status: 403 });
-    // Tenants cannot cancel once a booking has been approved — only admin can
-    if (booking.status === "Approved" && !isAdmin)
-      return NextResponse.json({ error: "Your booking has been approved and can no longer be cancelled. Please contact the landlord." }, { status: 403 });
+    // Block cancellation after tenant has moved in
+    if (booking.moved_in)
+      return NextResponse.json({ error: "This booking cannot be cancelled after move-in has been confirmed." }, { status: 400 });
     if (!["Pending", "Approved"].includes(booking.status))
-      return NextResponse.json({ error: "Only Pending bookings can be cancelled." }, { status: 400 });
+      return NextResponse.json({ error: "This booking cannot be cancelled." }, { status: 400 });
   }
 
   // ── Approve/Reject: admin or landlord only ───────────────
   if (status === "Approved" || status === "Rejected") {
     if (!isAdmin && !isLandlord)
       return NextResponse.json({ error: "Only admin or the assigned landlord can approve or reject bookings." }, { status: 403 });
+
+    // ── Receipt required before approving GCash bookings ──
+    if (status === "Approved" && booking.payment_method === "GCash") {
+      if (!booking.payment_receipt_url) {
+        return NextResponse.json({
+          error: `Cannot approve: the tenant has not uploaded a GCash receipt yet.`,
+        }, { status: 400 });
+      }
+    }
   }
 
   const { data, error } = await supabase
@@ -227,6 +236,8 @@ export async function PATCH(req: NextRequest) {
         message: `Your booking for "${title}" was not approved — another tenant was selected.`,
         type: "error",
         is_read: false,
+        link: "/bookings",
+        booking_id: o.id,
       }));
       if (rejectNotifs.length) await supabase.from("notifications").insert(rejectNotifs);
     }
@@ -237,6 +248,8 @@ export async function PATCH(req: NextRequest) {
       message: `✅ Your booking for "${title}" has been approved! The landlord will contact you soon.`,
       type: "success",
       is_read: false,
+      link: "/bookings",
+      booking_id: id,
     });
   }
 
@@ -255,6 +268,8 @@ export async function PATCH(req: NextRequest) {
       message: `❌ Your booking for "${title}" was not approved. You may apply for another property.`,
       type: "error",
       is_read: false,
+      link: "/bookings",
+      booking_id: id,
     });
   }
 
@@ -267,13 +282,13 @@ export async function PUT(req: NextRequest) {
   const supabase = getSupabaseAdmin();
   const contentType = req.headers.get("content-type") ?? "";
 
-  // ── Landlord confirms payment ────────────────────────────
+  // ── Landlord confirms payment or marks moved-in ─────────
   if (contentType.includes("application/json")) {
-    const { id, landlord_email, confirm } = await req.json();
-    if (!id || !landlord_email || !confirm)
-      return NextResponse.json({ error: "id, landlord_email and confirm required." }, { status: 400 });
+    const { id, landlord_email, confirm, mark_moved_in, role } = await req.json();
+    if (!id || !landlord_email)
+      return NextResponse.json({ error: "id and landlord_email required." }, { status: 400 });
 
-    // Verify booking belongs to this landlord
+    // Verify booking exists
     const { data: booking, error: fetchErr } = await supabase
       .from("bookings")
       .select("id, user_email, status, property_id, properties(title, landlord_email)")
@@ -283,9 +298,45 @@ export async function PUT(req: NextRequest) {
     if (fetchErr || !booking)
       return NextResponse.json({ error: "Booking not found." }, { status: 404 });
 
+    // Admins can act on any booking; landlords only on their own properties
     const propLandlord = (booking.properties as { landlord_email?: string } | null)?.landlord_email;
-    if (propLandlord !== landlord_email)
+    const isAdmin    = role === "admin";
+    const isLandlord = propLandlord === landlord_email;
+
+    if (!isAdmin && !isLandlord)
       return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
+
+    const title = (booking.properties as { title?: string } | null)?.title ?? "your property";
+
+    // ── Mark Moved In ────────────────────────────────────────
+    if (mark_moved_in) {
+      if (booking.status !== "Approved")
+        return NextResponse.json({ error: "Can only mark move-in for an Approved booking." }, { status: 400 });
+
+      const { data, error } = await supabase
+        .from("bookings")
+        .update({ moved_in: true })
+        .eq("id", id)
+        .select("*, properties(title)")
+        .single();
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      await supabase.from("notifications").insert({
+        user_email: booking.user_email,
+        message: `🏠 Your move-in for "${title}" has been confirmed by the landlord. Welcome to your new home!`,
+        type: "success",
+        is_read: false,
+        link: "/bookings",
+        booking_id: id,
+      });
+
+      return NextResponse.json(data);
+    }
+
+    // ── Confirm Payment ──────────────────────────────────────
+    if (!confirm)
+      return NextResponse.json({ error: "confirm or mark_moved_in required." }, { status: 400 });
 
     const { data, error } = await supabase
       .from("bookings")
@@ -296,12 +347,13 @@ export async function PUT(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const title = (data as { properties?: { title?: string } }).properties?.title ?? "your property";
     await supabase.from("notifications").insert({
       user_email: data.user_email,
       message: `💰 Your payment for "${title}" has been confirmed by the landlord!`,
       type: "success",
       is_read: false,
+      link: "/bookings",
+      booking_id: id,
     });
 
     return NextResponse.json(data);
@@ -330,8 +382,8 @@ export async function PUT(req: NextRequest) {
     if (booking.user_email !== user_email)
       return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
 
-    if (booking.status !== "Approved")
-      return NextResponse.json({ error: "You can only upload a receipt for an approved booking." }, { status: 400 });
+    if (!["Pending", "Approved"].includes(booking.status))
+      return NextResponse.json({ error: "You can only upload a receipt for a Pending or Approved booking." }, { status: 400 });
 
     // Upload file
     const { data: buckets } = await supabase.storage.listBuckets();
@@ -369,6 +421,7 @@ export async function PUT(req: NextRequest) {
         message: `📎 A tenant has uploaded a payment receipt for "${title}". Please verify it.`,
         type: "info",
         is_read: false,
+        link: "/landlord",
       });
     }
 

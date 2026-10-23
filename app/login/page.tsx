@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSession, setSession } from "@/lib/session";
+import { getSession, setSession, clearSession } from "@/lib/session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -47,6 +47,9 @@ export default function LoginPage() {
 
     if (!res.ok) { setServerError(data.error); return; }
 
+    // Always clear old session before starting a new one
+    clearSession();
+
     if (data.verified) {
       setSession({ email: form.email, name: data.name, role: "admin" });
       router.push("/admin");
@@ -77,7 +80,7 @@ export default function LoginPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.jpg" alt="Logo" className="w-12 h-12 rounded-full object-cover border-2 border-white/30" />
             <span className="text-2xl font-extrabold text-white tracking-tight">
-              HOME<span className="text-red-400 italic">Rent</span>
+              HOME<span className="text-lime-400 italic">Rent</span>
             </span>
           </div>
           <h1 className="text-4xl font-extrabold text-white leading-tight mb-3">
@@ -111,8 +114,8 @@ export default function LoginPage() {
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.jpg" alt="Logo" className="w-10 h-10 rounded-full object-cover" />
-            <span className="text-xl font-extrabold tracking-tight">
-              HOME<span className="text-red-500 italic">Rent</span>
+            <span className="text-xl font-extrabold tracking-tight text-gray-900">
+              HOME<span className="text-lime-500 italic">Rent</span>
             </span>
           </div>
 
@@ -139,14 +142,14 @@ export default function LoginPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className={`w-full border rounded-lg px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-gray-900 focus:border-transparent text-gray-900 ${errors.email ? "border-red-400 bg-red-50" : "border-gray-300 bg-white"}`}
               />
-              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+              {errors.email && <p className="text-lime-500 text-xs mt-1">{errors.email}</p>}
             </div>
 
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-sm font-semibold text-gray-700">Password</label>
-                <Link href="/forgot-password" className="text-xs text-red-500 hover:underline font-medium">
+                <Link href="/forgot-password" className="text-xs text-lime-500 hover:underline font-medium">
                   Forgot password?
                 </Link>
               </div>
@@ -175,7 +178,7 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
-              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+              {errors.password && <p className="text-lime-500 text-xs mt-1">{errors.password}</p>}
             </div>
 
             {/* Remember me */}
@@ -201,7 +204,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-gray-500 mt-6">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-red-500 font-semibold hover:underline">
+            <Link href="/register" className="text-lime-500 font-semibold hover:underline">
               Create one
             </Link>
           </p>

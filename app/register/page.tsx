@@ -21,7 +21,8 @@ export default function RegisterPage() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Full name is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid email.";
-    if (form.phone.trim() && !/^[+]?[\d\s\-().]{7,20}$/.test(form.phone.trim())) e.phone = "Enter a valid phone number.";
+    if (!form.phone.trim()) e.phone = "Phone number is required.";
+    else if (!/^[+]?[\d\s\-().]{7,20}$/.test(form.phone.trim())) e.phone = "Enter a valid phone number.";
     if (form.password.length < 8) e.password = "At least 8 characters.";
     else if (!/[A-Z]/.test(form.password)) e.password = "Must contain an uppercase letter.";
     else if (!/[0-9]/.test(form.password)) e.password = "Must contain a number.";
@@ -72,9 +73,9 @@ export default function RegisterPage() {
           <Image src="/logo.jpg" alt="Logo" width={40} height={40} className="rounded-full" />
         </div>
         <div className="flex justify-center mb-3">
-          <span className="text-2xl font-bold">HOME</span>
-          <span className="text-2xl font-bold text-red-500">R</span>
-          <span className="text-2xl italic text-red-500">ent</span>
+          <span className="text-2xl font-bold text-gray-900">HOME</span>
+          <span className="text-2xl font-bold text-lime-500">R</span>
+          <span className="text-2xl italic text-lime-500">ent</span>
         </div>
         <Image src="/pic.jpg" alt="House" width={320} height={100} className="w-full h-24 object-cover rounded mb-4" loading="eager" />
 
@@ -93,7 +94,7 @@ export default function RegisterPage() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-            {errors.name && <p className="text-red-500 text-[10px] mt-0.5">{errors.name}</p>}
+            {errors.name && <p className="text-lime-500 text-[10px] mt-0.5">{errors.name}</p>}
           </div>
 
           <div>
@@ -105,11 +106,11 @@ export default function RegisterPage() {
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
-            {errors.email && <p className="text-red-500 text-[10px] mt-0.5">{errors.email}</p>}
+            {errors.email && <p className="text-lime-500 text-[10px] mt-0.5">{errors.email}</p>}
           </div>
 
           <div>
-            <label className="text-xs font-semibold">Phone number <span className="text-gray-400 font-normal">(optional)</span></label>
+            <label className="text-xs font-semibold">Phone number <span className="text-lime-500">*</span></label>
             <div className="flex mt-0.5">
               <span className="inline-flex items-center px-2 border border-r-0 rounded-l bg-gray-50 text-gray-400 text-xs">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,7 +125,7 @@ export default function RegisterPage() {
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
             </div>
-            {errors.phone && <p className="text-red-500 text-[10px] mt-0.5">{errors.phone}</p>}
+            {errors.phone && <p className="text-lime-500 text-[10px] mt-0.5">{errors.phone}</p>}
           </div>
 
           <div>
@@ -155,7 +156,7 @@ export default function RegisterPage() {
                 <p className="text-[10px] text-gray-500 mt-0.5">{strengthLabel}</p>
               </div>
             )}
-            {errors.password && <p className="text-red-500 text-[10px] mt-0.5">{errors.password}</p>}
+            {errors.password && <p className="text-lime-500 text-[10px] mt-0.5">{errors.password}</p>}
           </div>
 
           <div>
@@ -176,7 +177,7 @@ export default function RegisterPage() {
                 )}
               </button>
             </div>
-            {errors.confirm && <p className="text-red-500 text-[10px] mt-0.5">{errors.confirm}</p>}
+            {errors.confirm && <p className="text-lime-500 text-[10px] mt-0.5">{errors.confirm}</p>}
           </div>
 
           <button

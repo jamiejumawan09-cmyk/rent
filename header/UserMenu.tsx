@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown, BookMarked, Heart, LogOut } from "lucide-react";
+import { ChevronDown, BookMarked, Heart, MessageCircle, LogOut } from "lucide-react";
 import { clearSession } from "@/lib/session";
 
 interface UserMenuProps {
@@ -51,21 +51,21 @@ export default function UserMenu({ userName, avatarUrl }: UserMenuProps) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
-        className="flex items-center gap-2.5 px-4 py-2 rounded-lg border border-white/30 bg-white/10 hover:bg-white/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="flex items-center gap-2.5 px-4 py-2 rounded-lg border border-green-200 bg-white/70 hover:bg-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
       >
         {/* Avatar */}
-        <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-bold shrink-0 overflow-hidden">
+        <span className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-[#315f40] text-sm font-bold shrink-0 overflow-hidden">
           {avatarUrl ? (
             <Image src={avatarUrl} alt={userName} width={36} height={36} className="object-cover w-full h-full" />
           ) : (
             initial
           )}
         </span>
-        <span className="text-sm font-semibold text-white max-w-[120px] truncate hidden sm:block">
+        <span className="text-sm font-semibold text-[#244b30] max-w-[120px] truncate hidden sm:block">
           {userName}
         </span>
         <ChevronDown
-          className={`w-3.5 h-3.5 text-white/60 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 text-[#5b8064] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -106,6 +106,14 @@ export default function UserMenu({ userName, avatarUrl }: UserMenuProps) {
               Favorites
             </Link>
             <Link
+              href="/messages"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <MessageCircle className="w-4 h-4 text-gray-400" />
+              Messages
+            </Link>
+            <Link
               href="/profile"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -121,7 +129,7 @@ export default function UserMenu({ userName, avatarUrl }: UserMenuProps) {
           <div className="border-t border-gray-100 py-1">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-lime-500 hover:bg-red-50 transition-colors"
             >
               <LogOut className="w-4 h-4" />
               Logout

@@ -226,28 +226,39 @@ export default function Map({ listings, single }: Props) {
   return (
     <div className="flex flex-col gap-2 w-full">
       {!single && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-            <span className="font-semibold">Price (₱)</span>
-            <input type="number" placeholder="Min" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="border rounded px-2 py-1 w-24 outline-none focus:ring-1 focus:ring-gray-400" />
-            <span>—</span>
-            <input type="number" placeholder="Max" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="border rounded px-2 py-1 w-24 outline-none focus:ring-1 focus:ring-gray-400" />
+        <div className="flex flex-wrap gap-3 items-center bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 mb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-white whitespace-nowrap">Price (₱)</span>
+            <input
+              type="number" placeholder="Min" value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              className="bg-white/20 border border-white/40 rounded-lg px-3 py-1.5 w-24 text-sm text-white placeholder-white/70 outline-none focus:ring-2 focus:ring-white font-medium"
+            />
+            <span className="text-white font-bold">—</span>
+            <input
+              type="number" placeholder="Max" value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              className="bg-white/20 border border-white/40 rounded-lg px-3 py-1.5 w-24 text-sm text-white placeholder-white/70 outline-none focus:ring-2 focus:ring-white font-medium"
+            />
           </div>
-          <button onClick={() => setNearMe(true)} className="flex items-center gap-1.5 bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700">
+          <button
+            onClick={() => setNearMe(true)}
+            className="flex items-center gap-1.5 bg-white text-[#387a4b] text-sm font-extrabold px-4 py-1.5 rounded-lg hover:bg-green-100 transition-colors"
+          >
             📍 Near Me
           </button>
           {userPos && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowRadius((v) => !v)}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${showRadius ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
+                className={`text-sm font-bold px-3 py-1.5 rounded-lg border transition-colors ${showRadius ? "bg-white text-[#387a4b] border-white" : "bg-white/20 text-white border-white/40 hover:bg-white/30"}`}
               >
                 ⭕ Radius
               </button>
               {showRadius && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                  <input type="range" min={1} max={50} value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} className="w-24 accent-blue-600" />
-                  <span className="font-semibold w-12">{radiusKm} km</span>
+                <div className="flex items-center gap-2">
+                  <input type="range" min={1} max={50} value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} className="w-24 accent-white" />
+                  <span className="text-sm font-bold text-white w-12">{radiusKm} km</span>
                 </div>
               )}
             </div>

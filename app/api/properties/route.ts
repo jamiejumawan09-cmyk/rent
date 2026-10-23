@@ -27,11 +27,13 @@ export async function POST(req: NextRequest) {
     const beds = formData.get("beds") ? Number(formData.get("beds")) : null;
     const baths = formData.get("baths") ? Number(formData.get("baths")) : null;
     const sqm = formData.get("sqm") ? Number(formData.get("sqm")) : null;
-    const landlord_email = (formData.get("landlord_email") as string) || null;
+    const landlordEmailInput = (formData.get("landlord_email") as string) || "";
+    const landlord_email = landlordEmailInput.trim() ? landlordEmailInput.trim().toLowerCase() : null;
     const landlord_name  = (formData.get("landlord_name")  as string) || null;
     const images = formData.getAll("images") as File[];
     const latitude  = formData.get("latitude")  ? Number(formData.get("latitude"))  : null;
     const longitude = formData.get("longitude") ? Number(formData.get("longitude")) : null;
+    const amenities: string[] = JSON.parse((formData.get("amenities") as string) || "[]");
 
     const imageUrls: string[] = [];
 
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase.from("properties").insert({
       title, location, price, status, description, beds, baths, sqm,
-      images: imageUrls, landlord_email, landlord_name, latitude, longitude,
+      images: imageUrls, landlord_email, landlord_name, latitude, longitude, amenities,
     }).select().single();
 
     if (error) {

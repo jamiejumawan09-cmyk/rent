@@ -20,4 +20,10 @@ export function setSession(data: SessionData) {
 
 export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
+  // Also clear any leftover temporary login/register keys
+  sessionStorage.removeItem("login_email");
+  sessionStorage.removeItem("login_name");
+  sessionStorage.removeItem("login_role");
+  sessionStorage.removeItem("reg_email");
+  sessionStorage.removeItem("reg_name");
 }

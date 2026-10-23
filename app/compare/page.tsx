@@ -58,10 +58,10 @@ export default function ComparePage() {
   ] as const;
 
   return (
-    <main className="min-h-screen bg-[#800000]">
+    <main className="min-h-screen bg-[#387a4b]">
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-extrabold text-white mb-1">Compare Properties</h1>
-        <p className="text-red-200 text-sm mb-6">Select up to 3 properties to compare side by side.</p>
+        <p className="text-lime-200 text-sm mb-6">Select up to 3 properties to compare side by side.</p>
 
         {/* Property selector */}
         <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 mb-6">
@@ -76,7 +76,7 @@ export default function ComparePage() {
                   onClick={() => toggle(p.id)}
                   className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                     selected.includes(p.id)
-                      ? "bg-white text-[#800000] border-white"
+                      ? "bg-white text-[#387a4b] border-white"
                       : "bg-white/10 text-white border-white/30 hover:bg-white/20"
                   }`}
                 >
@@ -113,7 +113,7 @@ export default function ComparePage() {
                         <p className="text-sm font-extrabold text-white">{p.title}</p>
                         <button
                           onClick={() => router.push(`/houses/${p.id}`)}
-                          className="mt-1 text-[10px] text-red-300 hover:text-white"
+                          className="mt-1 text-[10px] text-lime-300 hover:text-white"
                         >
                           View details →
                         </button>

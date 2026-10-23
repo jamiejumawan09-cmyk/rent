@@ -75,8 +75,8 @@ export default function ForgotPasswordPage() {
         </div>
         <div className="flex justify-center mb-4">
           <span className="text-2xl font-bold">HOME</span>
-          <span className="text-2xl font-bold text-red-500">R</span>
-          <span className="text-2xl italic text-red-500">ent</span>
+          <span className="text-2xl font-bold text-lime-500">R</span>
+          <span className="text-2xl italic text-lime-500">ent</span>
         </div>
 
         {/* Step 1 - Email */}
@@ -90,7 +90,7 @@ export default function ForgotPasswordPage() {
               placeholder="Enter your email" type="email"
               value={email} onChange={(e) => setEmail(e.target.value)}
             />
-            {emailError && <p className="text-red-500 text-[10px]">{emailError}</p>}
+            {emailError && <p className="text-lime-500 text-[10px]">{emailError}</p>}
             <button disabled={loading} className="mt-1 bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-gray-700 disabled:opacity-60">
               {loading ? "Checking..." : "CONTINUE"}
             </button>
@@ -102,7 +102,7 @@ export default function ForgotPasswordPage() {
           <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-2">
             <h2 className="text-sm font-bold text-center mb-1">New Password</h2>
             <p className="text-xs text-gray-500 text-center mb-2">Set a new password for <span className="font-semibold text-gray-700">{email}</span></p>
-            {serverError && <p className="text-red-500 text-[10px] text-center">{serverError}</p>}
+            {serverError && <p className="text-lime-500 text-[10px] text-center">{serverError}</p>}
             <div>
               <label className="text-xs font-semibold">New password</label>
               <div className="relative mt-0.5">
@@ -125,7 +125,7 @@ export default function ForgotPasswordPage() {
                   <p className="text-[10px] text-gray-500 mt-0.5">{strengthLabel}</p>
                 </div>
               )}
-              {passErrors.password && <p className="text-red-500 text-[10px] mt-0.5">{passErrors.password}</p>}
+              {passErrors.password && <p className="text-lime-500 text-[10px] mt-0.5">{passErrors.password}</p>}
             </div>
             <div>
               <label className="text-xs font-semibold">Confirm password</label>
@@ -143,7 +143,7 @@ export default function ForgotPasswordPage() {
                   )}
                 </button>
               </div>
-              {passErrors.confirm && <p className="text-red-500 text-[10px] mt-0.5">{passErrors.confirm}</p>}
+              {passErrors.confirm && <p className="text-lime-500 text-[10px] mt-0.5">{passErrors.confirm}</p>}
             </div>
             <button disabled={loading} className="mt-1 bg-gray-800 text-white text-xs font-bold py-2 rounded hover:bg-gray-700 disabled:opacity-60">
               {loading ? "Updating..." : "UPDATE PASSWORD"}

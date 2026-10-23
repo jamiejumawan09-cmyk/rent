@@ -55,6 +55,7 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
         marker.on("dragend", () => {
           const pos = marker.getLatLng();
           onChange(pos.lat, pos.lng);
+          reverseGeocode(pos.lat, pos.lng);
         });
       }
 
@@ -68,9 +69,11 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
           marker.on("dragend", () => {
             const pos = marker.getLatLng();
             onChange(pos.lat, pos.lng);
+            reverseGeocode(pos.lat, pos.lng);
           });
         }
         onChange(clickLat, clickLng);
+        reverseGeocode(clickLat, clickLng);
       });
     });
 
@@ -82,6 +85,29 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function reverseGeocode(lat: number, lng: number) {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        { headers: { "Accept-Language": "en" } }
+      );
+      const data = await res.json();
+      if (data?.address) {
+        const a = data.address;
+        // Build a clean address: "City, Province/State, Country"
+        const parts = [
+          a.city || a.town || a.municipality || a.village || a.suburb,
+          a.state || a.province || a.region,
+          a.country,
+        ].filter(Boolean);
+        const address = parts.join(", ");
+        if (address) onAddress?.(address);
+      }
+    } catch {
+      // silently ignore reverse geocode failures
+    }
+  }
 
   async function handleSearch(e?: React.MouseEvent | React.FormEvent) {
     e?.preventDefault();
@@ -96,10 +122,20 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
       );
       const data = await res.json();
       if (!data.length) { setSearchError("Address not found."); return; }
-      const { lat: rLat, lon: rLon, display_name } = data[0];
+      const { lat: rLat, lon: rLon, address } = data[0];
       const newLat = parseFloat(rLat);
       const newLng = parseFloat(rLon);
-      onAddress?.(display_name);
+      if (address) {
+        const parts = [
+          address.city || address.town || address.municipality || address.village || address.suburb,
+          address.state || address.province || address.region,
+          address.country,
+        ].filter(Boolean);
+        const cleanAddress = parts.join(", ");
+        onAddress?.(cleanAddress || data[0].display_name);
+      } else {
+        onAddress?.(data[0].display_name);
+      }
 
       import("leaflet").then((L) => {
         const map = mapRef.current!;
@@ -127,8 +163,8 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
         <input
-          className="flex-1 border rounded px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-gray-400"
-          placeholder="Search address (optional)..."
+          className="flex-1 border border-white/20 rounded px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-white/40 bg-white/10 text-white placeholder-white/30"
+          placeholder="Search address to auto-fill location..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSearch(); } }}
@@ -137,21 +173,21 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
           type="button"
           disabled={searching}
           onClick={handleSearch}
-          className="bg-gray-700 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-gray-600 disabled:opacity-60"
+          className="bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-white/30 disabled:opacity-60 border border-white/20"
         >
           {searching ? "..." : "Search"}
         </button>
       </div>
-      {searchError && <p className="text-red-500 text-[10px]">{searchError}</p>}
-      <p className="text-[10px] text-gray-400">Click on the map or drag the marker to set the location.</p>
+      {searchError && <p className="text-lime-500 text-[10px]">{searchError}</p>}
+      <p className="text-[10px] text-white/50">Click on the map or drag the marker — location will be auto-filled.</p>
       <div
         ref={containerRef}
         className="w-full rounded-xl overflow-hidden border"
         style={{ height: "260px" }}
       />
       {lat && lng && (
-        <p className="text-[10px] text-gray-500">
-          Selected: {lat.toFixed(5)}, {lng.toFixed(5)}
+        <p className="text-[10px] text-white/50">
+          📍 {lat.toFixed(5)}, {lng.toFixed(5)}
         </p>
       )}
     </div>

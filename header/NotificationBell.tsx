@@ -51,10 +51,13 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
 
   // ── Supabase Realtime subscription ──────────────────────
   useEffect(() => {
-    // Create a fresh client per mount — prevents React Strict Mode from
-    // reusing a channel that was already subscribed and torn down.
     const supabase = createSupabaseBrowser();
-    const channelName = `notifications:${userEmail}:${Date.now()}`;
+    // Supabase reuses channels by name; callbacks cannot be added after subscribe.
+    // A unique name also prevents Strict Mode/HMR from returning an old channel.
+    const instanceId = globalThis.crypto?.randomUUID?.()
+      ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const channelName = `notifications:${userEmail}:${instanceId}`;
+    let active = true;
 
     const channel = supabase
       .channel(channelName)
@@ -67,6 +70,7 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
           filter: `user_email=eq.${userEmail}`,
         },
         (payload) => {
+          if (!active) return;
           const newNotif = payload.new as Notification;
           setNotifications((prev) => [newNotif, ...prev].slice(0, 20));
         }
@@ -74,7 +78,8 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      active = false;
+      void supabase.removeChannel(channel);
     };
   }, [userEmail]);
 
@@ -121,7 +126,25 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
   // ── Navigate and close ────────────────────────────────────
   function handleNotifClick(notif: Notification) {
     setOpen(false);
-    router.push(notif.link ?? "/bookings");
+    // If link already has booking_id param, use as-is
+    if (notif.link) {
+      // Append booking_id highlight param if we have one
+      if (notif.booking_id && !notif.link.includes("highlight=")) {
+        router.push(`${notif.link}?highlight=${notif.booking_id}`);
+      } else {
+        router.push(notif.link);
+      }
+      return;
+    }
+    // Fallback from message content
+    const msg = notif.message.toLowerCase();
+    if (notif.booking_id) {
+      router.push(`/bookings?highlight=${notif.booking_id}`);
+    } else if (msg.includes("refund") || msg.includes("receipt") || msg.includes("payment") || msg.includes("move")) {
+      router.push("/bookings");
+    } else {
+      router.push("/bookings");
+    }
   }
 
   // ── Delete a notification ─────────────────────────────────
@@ -156,13 +179,13 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="true"
-        className="relative p-2 rounded-lg text-white/80 hover:bg-white/20 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="relative p-2 rounded-lg text-[#387a4b] hover:bg-green-100 hover:text-[#244b30] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
       >
         <Bell className="w-6 h-6" />
 
         {/* Unread badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-lime-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -178,7 +201,7 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
             {notifications.length > 0 && (
               <button
                 onClick={() => setNotifications([])}
-                className="text-[11px] text-gray-400 hover:text-red-500 transition-colors"
+                className="text-[11px] text-gray-400 hover:text-lime-500 transition-colors"
               >
                 Clear all
               </button>
@@ -212,7 +235,7 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors group ${!n.is_read ? "bg-blue-50/40" : ""}`}
                 >
                   {/* Unread dot */}
-                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 transition-colors ${!n.is_read ? "bg-red-500" : "bg-transparent"}`} />
+                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 transition-colors ${!n.is_read ? "bg-lime-500" : "bg-transparent"}`} />
 
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs leading-relaxed ${!n.is_read ? "text-gray-800 font-semibold" : "text-gray-600"}`}>
@@ -224,7 +247,7 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
                   {/* Delete button */}
                   <button
                     onClick={(e) => handleDelete(e, n.id)}
-                    className="text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0 mt-0.5"
+                    className="text-gray-300 hover:text-lime-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0 mt-0.5"
                     aria-label="Delete notification"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,7 +264,7 @@ export default function NotificationBell({ userEmail }: NotificationBellProps) {
             <div className="border-t border-gray-100 px-4 py-2.5 text-center">
               <button
                 onClick={() => { setOpen(false); router.push("/bookings"); }}
-                className="text-xs text-red-500 font-semibold hover:underline"
+                className="text-xs text-lime-500 font-semibold hover:underline"
               >
                 View all bookings →
               </button>

@@ -91,9 +91,10 @@ function VerifyOtpContent() {
 
     if (!res.ok) { setError(data.error); return; }
 
-    const name = type === "login"
+    // Always use the name returned directly from the API — freshest source
+    const name = data.name ?? (type === "login"
       ? (sessionStorage.getItem("login_name") ?? "")
-      : (sessionStorage.getItem("reg_name") ?? "");
+      : (sessionStorage.getItem("reg_name") ?? ""));
     const role = data.role ?? sessionStorage.getItem("login_role") ?? "user";
     setSession({ email, name, role, avatar_url: data.avatar_url ?? null });
     sessionStorage.removeItem("reg_name");
@@ -112,15 +113,15 @@ function VerifyOtpContent() {
   const secs = String(timer % 60).padStart(2, "0");
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#800000]">
+    <div className="min-h-screen flex items-center justify-center bg-[#387a4b]">
       <div className="bg-white/10 backdrop-blur-sm border border-white/20 w-80 rounded-lg shadow-md p-5">
         <div className="flex justify-center mb-1">
           <Image src="/logo.jpg" alt="Logo" width={40} height={40} className="rounded-full" />
         </div>
         <div className="flex justify-center mb-4">
           <span className="text-2xl font-bold text-white">HOME</span>
-          <span className="text-2xl font-bold text-red-300">R</span>
-          <span className="text-2xl italic text-red-300">ent</span>
+          <span className="text-2xl font-bold text-lime-300">R</span>
+          <span className="text-2xl italic text-lime-300">ent</span>
         </div>
 
         <div className="text-center mb-4">
@@ -152,13 +153,13 @@ function VerifyOtpContent() {
             ))}
           </div>
 
-          {error && <p className="text-red-500 text-[10px] text-center mb-2">{error}</p>}
+          {error && <p className="text-lime-500 text-[10px] text-center mb-2">{error}</p>}
           {success && <p className="text-green-600 text-[10px] text-center mb-2">{success}</p>}
 
           <div className="text-center mb-3">
             {timer > 0
-              ? <p className="text-xs text-gray-500">Expires in <span className={`font-bold ${timer <= 30 ? "text-red-500" : "text-gray-700"}`}>{mins}:{secs}</span></p>
-              : <p className="text-xs text-red-500 font-semibold">OTP expired</p>}
+              ? <p className="text-xs text-gray-500">Expires in <span className={`font-bold ${timer <= 30 ? "text-lime-500" : "text-gray-700"}`}>{mins}:{secs}</span></p>
+              : <p className="text-xs text-lime-500 font-semibold">OTP expired</p>}
           </div>
 
           <button

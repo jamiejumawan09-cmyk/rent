@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -40,6 +40,7 @@ type Property = {
   sqm?: number;
   latitude?: number;
   longitude?: number;
+  amenities?: string[];
 };
 
 type Review = {
@@ -91,7 +92,7 @@ export default function PropertyDetailPage() {
     move_in_date:      "",
     lease_duration:    "6 months",
     occupants:         "1",
-    payment_method:    "Cash",
+    payment_method:    "GCash",
     contact_method:    "Email",
     employment_status: "Employed",
     introduction:      "",
@@ -117,6 +118,8 @@ export default function PropertyDetailPage() {
   const [chatMsg, setChatMsg]       = useState("");
   const [sendingMsg, setSendingMsg] = useState(false);
   const [landlordEmail, setLandlordEmail] = useState("");
+  const [chatError, setChatError] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
 
   // Reviews
   const [reviews, setReviews]         = useState<Review[]>([]);
@@ -243,23 +246,40 @@ export default function PropertyDetailPage() {
 
   async function loadMessages() {
     if (!session) return;
-    const res = await fetch(`/api/messages?property_id=${id}&email=${encodeURIComponent(session.email)}`);
-    const data = await res.json();
-    if (Array.isArray(data)) setMessages(data);
+    setChatLoading(true);
+    setChatError("");
+    try {
+      const res = await fetch(`/api/messages?property_id=${encodeURIComponent(id)}&email=${encodeURIComponent(session.email)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load this conversation.");
+      setMessages(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Could not load this conversation.");
+    } finally {
+      setChatLoading(false);
+    }
   }
 
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!session || !chatMsg.trim() || !landlordEmail) return;
     setSendingMsg(true);
-    await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ property_id: id, sender_email: session.email, sender_name: session.name, receiver_email: landlordEmail, content: chatMsg }),
-    });
-    setChatMsg("");
-    setSendingMsg(false);
-    loadMessages();
+    setChatError("");
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ property_id: id, sender_email: session.email, sender_name: session.name, receiver_email: landlordEmail, content: chatMsg.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Your message could not be sent.");
+      setMessages((current) => [...current, data]);
+      setChatMsg("");
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Your message could not be sent.");
+    } finally {
+      setSendingMsg(false);
+    }
   }
 
   async function handleReviewSubmit(e: React.FormEvent) {
@@ -321,7 +341,7 @@ export default function PropertyDetailPage() {
   const images = property.images?.length ? property.images : [];
 
   return (
-    <div className="min-h-screen bg-[#800000]">
+    <div className="min-h-screen bg-[#387a4b]">
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
           <button onClick={() => router.back()} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800">
@@ -383,7 +403,8 @@ export default function PropertyDetailPage() {
                 <button onClick={() => setShowChat(false)} className="text-gray-400 hover:text-gray-600">✕</button>
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
-                {messages.length === 0 && <p className="text-xs text-gray-400 text-center mt-8">No messages yet. Start the conversation!</p>}
+                {chatLoading ? <p className="text-xs text-gray-400 text-center mt-8">Loading conversation...</p> : null}
+                {!chatLoading && messages.length === 0 && <p className="text-xs text-gray-400 text-center mt-8">No messages yet. Start the conversation!</p>}
                 {messages.map((m) => (
                   <div key={m.id} className={`flex ${m.sender_email === session?.email ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[75%] px-3 py-2 rounded-xl text-xs ${m.sender_email === session?.email ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-800"}`}>
@@ -393,6 +414,7 @@ export default function PropertyDetailPage() {
                   </div>
                 ))}
               </div>
+              {chatError && <p role="alert" className="px-4 pb-2 text-xs text-red-600">{chatError}</p>}
               <form onSubmit={handleSendMessage} className="px-4 py-3 border-t flex gap-2">
                 <input
                   className="flex-1 border rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-gray-400"
@@ -400,7 +422,7 @@ export default function PropertyDetailPage() {
                   value={chatMsg}
                   onChange={(e) => setChatMsg(e.target.value)}
                 />
-                <button type="submit" disabled={sendingMsg} className="bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-60">Send</button>
+                <button type="submit" disabled={sendingMsg || !chatMsg.trim() || !landlordEmail} className="bg-gray-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-60">{sendingMsg ? "Sending..." : "Send"}</button>
               </form>
             </div>
           </div>
@@ -440,12 +462,12 @@ export default function PropertyDetailPage() {
             )}
 
             {/* Property info */}
-            <div className="bg-white rounded-xl border p-5 shadow-sm">
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3 mb-2">
-                <h1 className="text-xl font-extrabold text-gray-800">{property.title}</h1>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${statusColor[property.status] ?? "bg-gray-100 text-gray-600"}`}>{property.status}</span>
+                <h1 className="text-xl font-extrabold text-white">{property.title}</h1>
+                <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${statusColor[property.status] ?? "bg-white/10 text-white/70"}`}>{property.status}</span>
               </div>
-              <div className="flex items-center gap-1 text-gray-500 mb-1">
+              <div className="flex items-center gap-1 text-white/70 mb-1">
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -455,31 +477,64 @@ export default function PropertyDetailPage() {
               {avgRating && (
                 <div className="flex items-center gap-1.5 mb-3">
                   <StarRow rating={Math.round(Number(avgRating))} />
-                  <span className="text-xs font-bold text-gray-700">{avgRating}</span>
-                  <span className="text-xs text-gray-400">({reviews.length} review{reviews.length !== 1 ? "s" : ""})</span>
+                  <span className="text-xs font-bold text-white">{avgRating}</span>
+                  <span className="text-xs text-white/50">({reviews.length} review{reviews.length !== 1 ? "s" : ""})</span>
                 </div>
               )}
-              <p className="text-2xl font-extrabold text-gray-800 mb-4">{property.price}</p>
+              <p className="text-2xl font-extrabold text-yellow-300 mb-4">{property.price}</p>
               {(property.beds || property.baths || property.sqm) && (
-                <div className="flex gap-4 text-sm text-gray-600 mb-4">
+                <div className="flex gap-4 text-sm text-white/80 mb-4">
                   {property.beds  && <span>🛏 {property.beds} Bed{property.beds > 1 ? "s" : ""}</span>}
                   {property.baths && <span>🚿 {property.baths} Bath{property.baths > 1 ? "s" : ""}</span>}
                   {property.sqm   && <span>📐 {property.sqm} sqm</span>}
                 </div>
               )}
-              {property.description && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-700 mb-1">Description</p>
-                  <p className="text-sm text-gray-500 leading-relaxed">{property.description}</p>
+              {property.amenities && property.amenities.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-white mb-2">Amenities</p>
+                  <div className="flex flex-wrap gap-2">
+                    {property.amenities.map((a) => {
+                      const amenityIcons: Record<string, React.ReactElement> = {
+                        "WiFi": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>,
+                        "Air Conditioning": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2" /></svg>,
+                        "Parking": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3m0 0h3l3 3v4h-2m-4 0H9m0 0a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z" /></svg>,
+                        "Swimming Pool": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21c1.5-1 3-1.5 4.5-1S10.5 21 12 21s3-.5 4.5-1 3-1.5 4.5-1M3 15c1.5-1 3-1.5 4.5-1S10.5 15 12 15s3-.5 4.5-1 3-1.5 4.5-1M12 3v6m-3-3l3-3 3 3" /></svg>,
+                        "Security Guard": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
+                        "CCTV": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8h12v8H3a1 1 0 01-1-1V9a1 1 0 011-1z" /></svg>,
+                        "Generator": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+                        "Water 24/7": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 0c0 0-5 6-5 10a5 5 0 0010 0c0-4-5-10-5-10z" /></svg>,
+                        "Laundry Area": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm9 4a4 4 0 100 8 4 4 0 000-8zm0 0l2 2" /></svg>,
+                        "Kitchen": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6h18M3 12h18M3 18h18M7 3v18M17 3v18" /></svg>,
+                        "Furnished": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 9V7a2 2 0 00-2-2H6a2 2 0 00-2 2v2m16 0H4m16 0a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2a2 2 0 012-2m4 6v2m8-2v2" /></svg>,
+                        "Pet Friendly": <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 9.5a2 2 0 100-4 2 2 0 000 4zm15 0a2 2 0 100-4 2 2 0 000 4zm-10-5a2 2 0 100-4 2 2 0 000 4zm5 0a2 2 0 100-4 2 2 0 000 4zm-2.5 7c-3.5 0-6 2-6 4.5h12c0-2.5-2.5-4.5-6-4.5z" /></svg>,
+                      };
+                      return (
+                        <span key={a} className="flex items-center gap-1.5 bg-white/10 border border-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-full">
+                          {amenityIcons[a] ?? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                          {a}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
-              {property.latitude && property.longitude && (
+              {property.description && (
+                <div>
+                  <p className="text-xs font-semibold text-white mb-1">Description</p>
+                  <p className="text-sm text-white/70 leading-relaxed">{property.description}</p>
+                </div>
+              )}
+              {property.latitude && property.longitude ? (
                 <div className="mt-2">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Location</p>
+                  <p className="text-xs font-semibold text-white mb-2">📍 Location</p>
                   <Map
                     listings={[]}
                     single={{ lat: property.latitude, lng: property.longitude, title: property.title }}
                   />
+                </div>
+              ) : (
+                <div className="mt-2 bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+                  <p className="text-xs text-white/50">📍 No map location available for this property.</p>
                 </div>
               )}
             </div>
@@ -700,9 +755,7 @@ export default function PropertyDetailPage() {
                       value={form.payment_method}
                       onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
                     >
-                      <option>Cash</option>
                       <option>GCash</option>
-                      <option>Bank Transfer</option>
                     </select>
                   </div>
 

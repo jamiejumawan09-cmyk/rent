@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #800000;
-  --foreground: #ffffff;
+  --background: #edf7ee;
+  --foreground: #244b30;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "Courier New", monospace;
 }
 
 body {
@@ -18,7 +18,81 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Keep input/textarea/select text always dark so it's readable on white backgrounds */
-input, textarea, select {
-  color: #111827;
+.light-green-theme {
+  --background: #edf7ee;
+  --foreground: #244b30;
 }
+
+/* Recolor the app's shared forest-green utility surfaces as soft sage. */
+.light-green-theme [class~="bg-[#387a4b]"] { background-color: #edf7ee !important; }
+.light-green-theme [class~="bg-[#3c754b]"] { background-color: #e5f2e6 !important; }
+.light-green-theme [class~="bg-[#315f40]"] { background-color: #dceedd !important; }
+.light-green-theme [class~="bg-[#2c5739]"] { background-color: #e5f2e6 !important; }
+.light-green-theme [style*="#3c754b"] { background-color: #e5f2e6 !important; }
+.light-green-theme [style*="#315f40"] { background-color: #dceedd !important; }
+.light-green-theme [class~="bg-white/5"] { background-color: #f4faf4 !important; }
+.light-green-theme [class~="bg-white/10"] { background-color: #f8fcf8 !important; }
+.light-green-theme [class~="bg-white/15"] { background-color: #f5faf5 !important; }
+.light-green-theme [class~="bg-white/20"] { background-color: #f1f8f2 !important; }
+.light-green-theme [class~="bg-white/25"] { background-color: #edf7ee !important; }
+.light-green-theme [class~="bg-white/30"] { background-color: #e9f4ea !important; }
+.light-green-theme [class~="bg-white/40"] { background-color: #e4f1e5 !important; }
+.light-green-theme [class~="bg-white/70"] { background-color: #fbfdfb !important; }
+.light-green-theme [class~="bg-gray-50"] { background-color: #f6fbf6 !important; }
+.light-green-theme [class~="bg-gray-100"] { background-color: #edf7ee !important; }
+.light-green-theme [class~="bg-gray-200"] { background-color: #e1efe3 !important; }
+.light-green-theme [class~="bg-gray-900"] { background-color: #e3f2e5 !important; }
+.light-green-theme [class~="bg-gray-800"] { background-color: #387a4b !important; }
+.light-green-theme [class~="bg-gray-700"] { background-color: #dceedd !important; }
+.light-green-theme [class~="bg-gray-600"] { background-color: #c5e2c9 !important; }
+.light-green-theme [class~="hover:bg-gray-50"]:hover { background-color: #edf7ee !important; }
+.light-green-theme [class~="hover:bg-gray-700"]:hover { background-color: #d2e8d5 !important; }
+.light-green-theme [class~="hover:bg-gray-800"]:hover { background-color: #dceedd !important; }
+.light-green-theme [class~="border-gray-100"],
+.light-green-theme [class~="border-gray-200"] { border-color: #d6e8d8 !important; }
+.light-green-theme [class~="border-white"] { border-color: #cbdfcc !important; }
+.light-green-theme [class~="border-white/10"] { border-color: #dceedd !important; }
+.light-green-theme [class~="border-white/20"] { border-color: #d6e8d8 !important; }
+.light-green-theme [class~="border-white/30"] { border-color: #cbdfcc !important; }
+.light-green-theme [class~="border-white/40"] { border-color: #c0d8c4 !important; }
+.light-green-theme [class~="hover:bg-white/10"]:hover { background-color: #f1f8f2 !important; }
+.light-green-theme [class~="hover:bg-white/20"]:hover { background-color: #e9f4ea !important; }
+.light-green-theme [class~="hover:bg-white/30"]:hover { background-color: #e1efe3 !important; }
+
+/* Dark green and white text utilities were paired throughout the old theme. */
+.light-green-theme [class~="text-white"],
+.light-green-theme [class*="text-white/"] {
+  color: #244b30 !important;
+}
+.light-green-theme [class~="text-white/90"],
+.light-green-theme [class~="text-white/80"] { color: #315f40 !important; }
+.light-green-theme [class~="text-white/70"],
+.light-green-theme [class~="text-white/60"],
+.light-green-theme [class~="text-white/50"] { color: #64806a !important; }
+.light-green-theme [class~="text-white/40"],
+.light-green-theme [class~="text-white/30"] { color: #78917d !important; }
+.light-green-theme [class*="bg-gradient-to-r"] [class~="text-white"] { color: #ffffff !important; }
+
+/* Preserve white labels on saturated buttons, badges, and image overlays. */
+.light-green-theme [class~="bg-green-500"][class~="text-white"],
+.light-green-theme [class~="bg-green-600"][class~="text-white"],
+.light-green-theme [class~="bg-lime-500"][class~="text-white"],
+.light-green-theme [class~="bg-lime-600"][class~="text-white"],
+.light-green-theme [class*="bg-lime-500/"][class~="text-white"],
+.light-green-theme [class*="bg-green-500/"][class~="text-white"],
+.light-green-theme [class*="bg-blue-500/"][class~="text-white"],
+.light-green-theme [class~="bg-blue-500"][class~="text-white"],
+.light-green-theme [class~="bg-blue-600"][class~="text-white"],
+.light-green-theme [class~="bg-red-500"][class~="text-white"],
+.light-green-theme [class~="bg-red-600"][class~="text-white"],
+.light-green-theme [class~="bg-yellow-500"][class~="text-white"],
+.light-green-theme [class~="bg-purple-500"][class~="text-white"],
+.light-green-theme [class~="bg-orange-500"][class~="text-white"],
+.light-green-theme [class~="bg-gray-800"][class~="text-white"],
+.light-green-theme [class*="bg-black/"][class~="text-white"] { color: #ffffff !important; }
+
+.light-green-theme input,
+.light-green-theme textarea,
+.light-green-theme select { color: #244b30; }
+.light-green-theme input::placeholder,
+.light-green-theme textarea::placeholder { color: #78917d; }

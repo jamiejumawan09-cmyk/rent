@@ -9,12 +9,14 @@ import UserMenu from "./UserMenu";
 import MobileMenu from "./MobileMenu";
 import NotificationBell from "./NotificationBell";
 
-// Center nav — About & Contact moved to footer
+// Center nav
 const centerLinks = [
   { href: "/home",    label: "Home" },
   { href: "/houses",  label: "Houses" },
   { href: "/map",     label: "Map" },
   { href: "/compare", label: "Compare" },
+  { href: "/about",   label: "About" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export default function Header() {
@@ -44,7 +46,7 @@ export default function Header() {
   useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#800000]/70 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-green-200 bg-[#edf7ee]/95 backdrop-blur-md shadow-sm">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6">
 
         {/* ── Left: Logo ── */}
@@ -55,9 +57,9 @@ export default function Header() {
             alt="HOMERent logo"
             className="h-11 w-11 rounded-full object-cover"
           />
-          <span className="text-xl font-extrabold tracking-tight leading-none text-white">
+          <span className="text-xl font-extrabold tracking-tight leading-none text-[#244b30]">
             HOME
-            <span className="text-red-300 font-extrabold italic">Rent</span>
+            <span className="text-[#387a4b] italic">Rent</span>
           </span>
         </Link>
 
@@ -76,8 +78,8 @@ export default function Header() {
               <Link
                 href="/favorites"
                 aria-label="Favorites"
-                className="p-2 rounded-lg text-white/80 hover:bg-white/20 hover:text-white transition-colors"
-              >
+                className="p-2 rounded-lg text-[#387a4b] hover:bg-green-100 hover:text-[#244b30] transition-colors"
+               >
                 <Heart className="w-6 h-6" />
               </Link>
 
@@ -91,13 +93,13 @@ export default function Header() {
             <>
               <Link
                 href="/login"
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:bg-white/20 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-[#315f40] hover:bg-green-100 transition-colors"
               >
                 Login
               </Link>
               <Link
                 href="/register"
-                className="px-5 py-2 rounded-lg text-sm font-medium text-[#800000] bg-white hover:bg-red-100 transition-colors"
+                className="px-5 py-2 rounded-lg text-sm font-medium text-[#387a4b] bg-white hover:bg-green-100 transition-colors"
               >
                 Sign up
               </Link>
@@ -107,7 +109,7 @@ export default function Header() {
 
         {/* ── Hamburger (mobile) ── */}
         <button
-          className="md:hidden p-2 rounded-lg text-white hover:bg-white/20 transition-colors"
+          className="md:hidden p-2 rounded-lg text-[#315f40] hover:bg-green-100 transition-colors"
           onClick={() => setMenuOpen((o) => !o)}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}

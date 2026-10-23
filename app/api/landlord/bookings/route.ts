@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest) {
   // ── Security: verify booking belongs to this landlord's property ──
   const { data: booking, error: fetchError } = await supabase
     .from("bookings")
-    .select("id, user_email, user_name, status, property_id, properties(title, landlord_email)")
+    .select("id, user_email, user_name, status, property_id, payment_method, payment_receipt_url, properties(title, landlord_email)")
     .eq("id", id)
     .single();
 
@@ -57,6 +57,15 @@ export async function PATCH(req: NextRequest) {
 
   if (booking.status !== "Pending")
     return NextResponse.json({ error: `Cannot ${status.toLowerCase()} a booking that is already ${booking.status}.` }, { status: 400 });
+
+  // ── Receipt required before approving GCash bookings ──
+  if (status === "Approved" && booking.payment_method === "GCash") {
+    if (!booking.payment_receipt_url) {
+      return NextResponse.json({
+        error: `Cannot approve: the tenant has not uploaded a GCash receipt yet.`,
+      }, { status: 400 });
+    }
+  }
 
   // ── Apply the status change ──────────────────────────────
   const { data, error } = await supabase
@@ -100,6 +109,8 @@ export async function PATCH(req: NextRequest) {
           message: `Your booking for "${title}" was not approved — another tenant was selected.`,
           type: "error",
           is_read: false,
+          link: "/bookings",
+          booking_id: o.id,
         }))
       );
     }
@@ -110,6 +121,8 @@ export async function PATCH(req: NextRequest) {
       message: `✅ Your booking for "${title}" has been approved! The landlord will contact you soon.`,
       type: "success",
       is_read: false,
+      link: "/bookings",
+      booking_id: id,
     });
   }
 
@@ -120,6 +133,8 @@ export async function PATCH(req: NextRequest) {
       message: `❌ Your booking for "${title}" was not approved. You may apply for another property.`,
       type: "error",
       is_read: false,
+      link: "/bookings",
+      booking_id: id,
     });
   }
 

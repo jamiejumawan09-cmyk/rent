@@ -1,12 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// Returns a brand-new Supabase client each time.
-// Used for Realtime subscriptions in components — each mount
-// gets its own client so React Strict Mode double-invocation
-// never reuses a torn-down channel.
+const browserGlobal = globalThis as typeof globalThis & {
+  __homeRentSupabaseBrowser?: SupabaseClient;
+};
+
+// Reuse one client per browser context; channels are managed separately.
 export function createSupabaseBrowser() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  if (!browserGlobal.__homeRentSupabaseBrowser) {
+    browserGlobal.__homeRentSupabaseBrowser = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+
+  return browserGlobal.__homeRentSupabaseBrowser;
 }

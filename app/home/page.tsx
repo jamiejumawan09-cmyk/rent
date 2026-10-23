@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSession, clearSession } from "@/lib/session";
+import { CircleCheck, Info, Megaphone, TriangleAlert, X } from "lucide-react";
 
 type Property = {
   id: string;
@@ -51,6 +52,64 @@ type Stats = {
   totalReviews: number;
 };
 
+// ── Announcement section above footer ────────────────────
+function AnnouncementSection() {
+  const [announcements, setAnnouncements] = useState<{ id: string; message: string; type: string; posted_by?: string; created_at?: string }[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/announcements")
+      .then((r) => r.json())
+      .then((d) => setAnnouncements(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []);
+
+  const visible = announcements.filter((a) => !dismissed.includes(a.id));
+  if (!visible.length) return null;
+
+  const styles: Record<string, { bg: string; text: string; border: string }> = {
+    info:    { bg: "bg-green-100", text: "text-[#244b30]", border: "border-green-300" },
+    warning: { bg: "bg-amber-100", text: "text-amber-900", border: "border-amber-300" },
+    success: { bg: "bg-emerald-100", text: "text-emerald-900", border: "border-emerald-300" },
+  };
+
+  return (
+    <section className="bg-[#e3f2e5] border-t border-green-200 px-4 py-6">
+      <div className="max-w-6xl mx-auto">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#456b4e] mb-3"><Megaphone className="h-4 w-4" /> Announcements</p>
+        <div className="flex flex-col gap-2">
+          {visible.map((a) => {
+            const s = styles[a.type] ?? styles.info;
+            return (
+              <div key={a.id} className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 shadow-sm ${s.bg} ${s.border}`}>
+                <div className="flex items-start gap-2">
+                  <span className={`shrink-0 mt-0.5 ${s.text}`}>
+                    {a.type === "warning" ? <TriangleAlert className="h-4 w-4" /> : a.type === "success" ? <CircleCheck className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                  </span>
+                  <div>
+                    <p className={`text-sm font-medium ${s.text}`}>{a.message}</p>
+                    <p className="text-[10px] text-[#54745b] mt-0.5">
+                      Posted by <span className="font-semibold text-[#315f40]">{a.posted_by ?? "Admin"}</span>
+                      {a.created_at && `- ${new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDismissed((p) => [...p, a.id])}
+                  className="shrink-0 text-[#64806a] hover:text-[#244b30] mt-0.5"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [search, setSearch]         = useState("");
@@ -59,8 +118,6 @@ export default function HomePage() {
   const [loading, setLoading]       = useState(true);
   const [liveStats, setLiveStats]   = useState<Stats | null>(null);
   const [ratings, setRatings]       = useState<RatingSummary>({});
-  const [announcements, setAnnouncements] = useState<{ id: string; message: string; type: string }[]>([]);
-  const [dismissedAnnounce, setDismissedAnnounce] = useState<string[]>([]);
 
   useEffect(() => {
     const session = getSession();
@@ -73,21 +130,22 @@ export default function HomePage() {
       .then((d) => { setProperties(Array.isArray(d) ? d : []); setLoading(false); })
       .catch(() => setLoading(false));
 
-    // Live stats
-    fetch("/api/stats")
-      .then((r) => r.json())
-      .then((d) => setLiveStats(d))
-      .catch(() => {});
+    // Live stats — refresh every 30 seconds
+    function fetchStats() {
+      fetch("/api/stats")
+        .then((r) => r.json())
+        .then((d) => setLiveStats(d))
+        .catch(() => {});
+    }
+    fetchStats();
+    const statsInterval = setInterval(fetchStats, 30000);
+    return () => clearInterval(statsInterval);
 
     // Ratings summary
     fetch("/api/reviews/summary")
       .then((r) => r.json())
       .then((d) => setRatings(d ?? {}))
       .catch(() => {});
-
-    fetch("/api/announcements")
-      .then((r) => r.json())
-      .then((d) => setAnnouncements(Array.isArray(d) ? d : []));
   }, []);
 
   function handleLogout() {
@@ -101,33 +159,18 @@ export default function HomePage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#800000] font-sans">
-
-      {/* Announcement banners */}
-      {announcements.filter((a) => !dismissedAnnounce.includes(a.id)).map((a) => {
-        const styles: Record<string, string> = {
-          info:    "bg-blue-600 text-white",
-          warning: "bg-yellow-400 text-yellow-900",
-          success: "bg-green-600 text-white",
-        };
-        return (
-          <div key={a.id} className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 text-sm font-medium ${styles[a.type] ?? styles.info}`}>
-            <span>{a.message}</span>
-            <button onClick={() => setDismissedAnnounce((p) => [...p, a.id])} className="shrink-0 opacity-70 hover:opacity-100 text-lg leading-none">×</button>
-          </div>
-        );
-      })}
+    <div className="min-h-screen bg-[#387a4b] font-sans">
 
       {/* Hero */}
       <section className="relative h-72 md:h-96 overflow-hidden">
         <Image src="/pic.jpg" alt="Hero" fill sizes="100vw" className="object-cover" priority />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/30 flex flex-col justify-center px-6 md:px-16">
-          <p className="text-red-400 text-xs font-bold uppercase tracking-widest mb-2">Find your perfect home</p>
+          <p className="text-lime-400 text-xs font-bold uppercase tracking-widest mb-2">Find your perfect home</p>
           <h1 className="text-white text-3xl md:text-5xl font-extrabold leading-tight mb-2">
             Comfortable,<br />Safe & Affordable
           </h1>
           <p className="text-gray-300 text-sm md:text-base max-w-md">
-            Browse hundreds of rental properties across Metro Manila. Find the home that fits your lifestyle.
+            Browse hundreds of rental properties across the Philippines. Find the home that fits your lifestyle.
           </p>
         </div>
       </section>
@@ -153,7 +196,7 @@ export default function HomePage() {
               </button>
             )}
           </div>
-          <button className="bg-white text-[#800000] text-sm font-bold px-6 py-2 rounded-lg hover:bg-red-100 transition-colors shrink-0">
+          <button className="bg-white text-[#387a4b] text-sm font-bold px-6 py-2 rounded-lg hover:bg-green-100 transition-colors shrink-0">
             Search
           </button>
         </div>
@@ -161,6 +204,12 @@ export default function HomePage() {
 
       {/* Stats */}
       <section className="max-w-6xl mx-auto px-4 mt-8">
+        <div className="flex items-center justify-between mb-3">
+          <span className="flex items-center gap-1.5 text-xs text-green-300 font-semibold">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse inline-block" />
+            Live Stats
+          </span>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: "Properties Listed", value: liveStats ? `${liveStats.properties}` : "—", icon: "🏠" },
@@ -177,7 +226,7 @@ export default function HomePage() {
               <p className={`text-2xl font-extrabold text-white ${!liveStats ? "animate-pulse opacity-30" : ""}`}>
                 {s.value}
               </p>
-              <p className="text-xs text-red-200 mt-1">{s.label}</p>
+              <p className="text-xs text-white/70 mt-1">{s.label}</p>
             </div>
           ))}
         </div>
@@ -187,11 +236,11 @@ export default function HomePage() {
       <section id="houses" className="max-w-6xl mx-auto px-4 mt-10 pb-16">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 className="text-xl font-extrabold text-white">Available Properties</h2>
-          <span className="text-xs text-red-200">{filtered.length} propert{filtered.length === 1 ? "y" : "ies"} found</span>
+          <span className="text-xs text-lime-200">{filtered.length} propert{filtered.length === 1 ? "y" : "ies"} found</span>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-white/10 rounded-xl overflow-hidden border border-white/20 animate-pulse">
                 <div className="h-44 bg-white/10" />
@@ -212,7 +261,7 @@ export default function HomePage() {
             <p className="text-xs mt-1">{properties.length === 0 ? "No properties have been added yet." : "Try a different search."}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((p, index) => (
               <div
                 key={p.id}
@@ -236,22 +285,22 @@ export default function HomePage() {
                 </div>
 
                 {/* Content */}
-                <div className="p-3">
-                  <div className="flex items-start justify-between gap-1 mb-1">
-                    <h3 className="text-sm font-bold text-white leading-tight">{p.title}</h3>
-                    <p className="text-sm font-extrabold text-red-200 shrink-0">{p.price}</p>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <h3 className="text-base font-extrabold text-white leading-tight">{p.title}</h3>
+                    <p className="text-base font-extrabold text-yellow-300 shrink-0">₱{p.price.replace(/[^0-9,]/g, "")}</p>
                   </div>
 
-                  <div className="flex items-center gap-1 mb-2">
-                    <svg className="w-3 h-3 shrink-0 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center gap-1 mb-2.5">
+                    <svg className="w-3.5 h-3.5 shrink-0 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span className="text-[10px] text-white/60 truncate">{p.location}</span>
+                    <span className="text-xs text-white/80 truncate">{p.location}</span>
                   </div>
 
                   {(p.beds != null || p.baths != null || p.sqm != null) && (
-                    <div className="flex items-center gap-3 text-[10px] text-white/60 mb-2">
+                    <div className="flex items-center gap-3 text-xs text-white/80 mb-2.5 font-medium">
                       {p.beds  != null && <span>🛏 {p.beds} Bed</span>}
                       {p.baths != null && <span>🚿 {p.baths} Bath</span>}
                       {p.sqm   != null && <span>📐 {p.sqm} sqm</span>}
@@ -259,7 +308,7 @@ export default function HomePage() {
                   )}
 
                   {p.description && (
-                    <p className="text-[10px] text-white/50 leading-relaxed mb-3 line-clamp-2">{p.description}</p>
+                    <p className="text-xs text-white/70 leading-relaxed mb-3 line-clamp-2">{p.description}</p>
                   )}
 
                   {ratings[p.id] && (
@@ -268,7 +317,7 @@ export default function HomePage() {
 
                   <button
                     onClick={(e) => { e.stopPropagation(); router.push(`/houses/${p.id}`); }}
-                    className="w-full bg-white/20 hover:bg-white/30 text-white text-xs font-bold py-2 rounded-lg border border-white/20 transition-colors"
+                    className="w-full bg-white text-[#387a4b] text-sm font-extrabold py-2.5 rounded-lg hover:bg-green-100 transition-colors"
                   >
                     BOOK NOW
                   </button>
@@ -280,13 +329,13 @@ export default function HomePage() {
       </section>
 
       {/* About / CTA banner */}
-      <section id="about" className="bg-[#5c0000] text-white py-12 px-4 border-t border-white/10">
+      <section id="about" className="bg-[#315f40] text-white py-12 px-4 border-t border-white/10">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-8">
           <div className="flex-1">
-            <p className="text-red-300 text-xs font-bold uppercase tracking-widest mb-2">Why choose us</p>
+            <p className="text-lime-300 text-xs font-bold uppercase tracking-widest mb-2">Why choose us</p>
             <h2 className="text-2xl md:text-3xl font-extrabold mb-3">Your trusted rental partner</h2>
             <p className="text-white/70 text-sm leading-relaxed max-w-md">
-              HOMERent connects tenants with verified landlords across Metro Manila. Every listing is inspected and verified for your safety and comfort.
+              HOMERent connects tenants with verified landlords across the Philippines. Every listing is inspected and verified for your safety and comfort.
             </p>
             <div className="flex gap-4 mt-6">
               {["Verified Listings", "24/7 Support", "Secure Payments"].map((f) => (
@@ -305,32 +354,46 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Announcements above footer */}
+      <AnnouncementSection />
+
       {/* Footer */}
-      <footer id="contact" className="bg-[#4a0000] text-white/60 py-8 px-4 border-t border-white/10">
+      <footer id="contact" className="bg-[#e3f2e5] text-[#54745b] py-8 px-4 border-t border-green-200">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between gap-6">
           <div>
-            <span className="text-white text-lg font-bold">
-              HOME<span className="text-red-300">R</span><span className="text-red-300 italic">ent</span>
+            <span className="text-[#244b30] text-lg font-bold">
+              HOME<span className="text-lime-700">R</span><span className="text-lime-700 italic">ent</span>
             </span>
-            <p className="text-xs mt-2 max-w-xs text-white/50">Comfortable, Safe, Affordable rental homes across Metro Manila.</p>
+            <p className="text-xs mt-2 max-w-xs text-[#64806a]">Comfortable, Safe, Affordable rental homes across the Philippines.</p>
           </div>
           <div className="flex gap-12 text-xs">
             <div>
-              <p className="text-white font-semibold mb-2">Quick Links</p>
-              {["Home", "Houses", "About", "Contact"].map((l) => (
-                <p key={l} className="mb-1 hover:text-white cursor-pointer">{l}</p>
+              <p className="text-[#244b30] font-semibold mb-2">Quick Links</p>
+              {[
+                { label: "Home",    href: "/home" },
+                { label: "Houses",  href: "/houses" },
+                { label: "About",   href: "/about" },
+                { label: "Contact", href: "/contact" },
+              ].map((l) => (
+                <p
+                  key={l.label}
+                  onClick={() => router.push(l.href)}
+                  className="mb-1 hover:text-[#244b30] cursor-pointer transition-colors"
+                >
+                  {l.label}
+                </p>
               ))}
             </div>
             <div>
-              <p className="text-white font-semibold mb-2">Contact</p>
+              <p className="text-[#244b30] font-semibold mb-2">Contact</p>
               <p className="mb-1">info@homerent.ph</p>
               <p className="mb-1">+63 912 345 6789</p>
               <p>Metro Manila, PH</p>
             </div>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto border-t border-white/10 mt-6 pt-4 text-center text-[10px] text-white/30">
-          © {new Date().getFullYear()} HOMERent. All rights reserved.
+        <div className="max-w-6xl mx-auto border-t border-green-200 mt-6 pt-4 text-center text-[10px] text-[#64806a]">
+          &copy; {new Date().getFullYear()} HOMERent. All rights reserved.
         </div>
       </footer>
     </div>

@@ -122,7 +122,7 @@ export default function ProfilePage() {
   const initials = profile.name?.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) ?? "?";
 
   return (
-    <main className="min-h-screen bg-[#800000]">
+    <main className="min-h-screen bg-[#387a4b]">
       <div className="max-w-xl mx-auto px-4 py-10">
         <div className="mb-6">
           <h1 className="text-2xl font-extrabold text-gray-800">My Profile</h1>
@@ -190,7 +190,7 @@ export default function ProfilePage() {
         <div className="bg-white rounded-xl border shadow-sm p-6">
           <h2 className="text-sm font-extrabold text-gray-800 mb-4">Personal Information</h2>
 
-          {saveError   && <p className="text-red-500 text-xs bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{saveError}</p>}
+          {saveError   && <p className="text-lime-500 text-xs bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{saveError}</p>}
           {saveSuccess && <p className="text-green-600 text-xs bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">{saveSuccess}</p>}
 
           <form onSubmit={handleSave} className="flex flex-col gap-4">
@@ -247,7 +247,7 @@ export default function ProfilePage() {
         {/* Change password */}
         <div className="bg-white rounded-xl border shadow-sm p-6 mt-5">
           <h2 className="text-sm font-extrabold text-gray-800 mb-4">Change Password</h2>
-          {pwError   && <p className="text-red-500 text-xs bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{pwError}</p>}
+          {pwError   && <p className="text-lime-500 text-xs bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{pwError}</p>}
           {pwSuccess && <p className="text-green-600 text-xs bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">{pwSuccess}</p>}
           <form onSubmit={handlePasswordChange} className="flex flex-col gap-3">
             {(["current", "next", "confirm"] as const).map((f) => (
